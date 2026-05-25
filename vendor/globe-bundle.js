@@ -26975,6 +26975,7 @@ void main() {
         scene.remove(atmosphere);
       }
       const geometry = createTerrainSphere(result, generator);
+      const segments = resolutionSegments(result);
       const material = new MeshStandardMaterial({
         vertexColors: true,
         roughness: 0.78,
@@ -26983,7 +26984,7 @@ void main() {
       });
       mesh = new Mesh(geometry, material);
       ocean = new Mesh(
-        new SphereGeometry(1.552, 128, 80),
+        new SphereGeometry(1.552, segments, Math.max(48, Math.round(segments * 0.62))),
         new MeshPhysicalMaterial({
           color: 1457525,
           transparent: true,
@@ -26997,7 +26998,7 @@ void main() {
         })
       );
       atmosphere = new Mesh(
-        new SphereGeometry(1.64, 128, 80),
+        new SphereGeometry(1.64, segments, Math.max(48, Math.round(segments * 0.62))),
         new MeshBasicMaterial({
           color: 8370175,
           transparent: true,
@@ -27011,6 +27012,8 @@ void main() {
       scene.add(mesh);
       scene.add(ocean);
       scene.add(atmosphere);
+      container.dataset.resolution = String(result.settings.resolution);
+      container.dataset.vertexCount = String(geometry.attributes.position.count);
       draw();
     }
     function resize() {
@@ -27046,7 +27049,7 @@ void main() {
     return { render, resize };
   }
   function createTerrainSphere(result, generator) {
-    const segments = Math.max(64, Math.min(384, result.settings.resolution));
+    const segments = resolutionSegments(result);
     const geometry = new SphereGeometry(1.55, segments, Math.max(48, Math.round(segments * 0.62)));
     const position = geometry.attributes.position;
     const colors = [];
@@ -27075,6 +27078,9 @@ void main() {
     geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
     return geometry;
+  }
+  function resolutionSegments(result) {
+    return Math.max(64, Math.min(384, result.settings.resolution));
   }
   function percentile(values, ratio) {
     const sorted = [...values].sort((a, b) => a - b);

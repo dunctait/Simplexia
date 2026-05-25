@@ -79,6 +79,7 @@ export function createGlobeScene(container, generator) {
     }
 
     const geometry = createTerrainSphere(result, generator);
+    const segments = resolutionSegments(result);
     const material = new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 0.78,
@@ -87,7 +88,7 @@ export function createGlobeScene(container, generator) {
     });
     mesh = new THREE.Mesh(geometry, material);
     ocean = new THREE.Mesh(
-      new THREE.SphereGeometry(1.552, 128, 80),
+      new THREE.SphereGeometry(1.552, segments, Math.max(48, Math.round(segments * 0.62))),
       new THREE.MeshPhysicalMaterial({
         color: 0x163d75,
         transparent: true,
@@ -101,7 +102,7 @@ export function createGlobeScene(container, generator) {
       })
     );
     atmosphere = new THREE.Mesh(
-      new THREE.SphereGeometry(1.64, 128, 80),
+      new THREE.SphereGeometry(1.64, segments, Math.max(48, Math.round(segments * 0.62))),
       new THREE.MeshBasicMaterial({
         color: 0x7fb7ff,
         transparent: true,
@@ -115,6 +116,8 @@ export function createGlobeScene(container, generator) {
     scene.add(mesh);
     scene.add(ocean);
     scene.add(atmosphere);
+    container.dataset.resolution = String(result.settings.resolution);
+    container.dataset.vertexCount = String(geometry.attributes.position.count);
     draw();
   }
 
@@ -155,7 +158,7 @@ export function createGlobeScene(container, generator) {
 }
 
 function createTerrainSphere(result, generator) {
-  const segments = Math.max(64, Math.min(384, result.settings.resolution));
+  const segments = resolutionSegments(result);
   const geometry = new THREE.SphereGeometry(1.55, segments, Math.max(48, Math.round(segments * 0.62)));
   const position = geometry.attributes.position;
   const colors = [];
@@ -184,6 +187,10 @@ function createTerrainSphere(result, generator) {
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
   return geometry;
+}
+
+function resolutionSegments(result) {
+  return Math.max(64, Math.min(384, result.settings.resolution));
 }
 
 function percentile(values, ratio) {
