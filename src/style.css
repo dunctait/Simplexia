@@ -45,33 +45,20 @@ button:hover, .segmented.is-active {
 }
 
 .app-shell {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 16px;
-  width: min(1280px, 100%);
+  position: relative;
+  width: 100%;
   height: 100vh;
-  margin: 0 auto;
-  padding: 16px;
   overflow: hidden;
 }
 
-.map-panel, .control-panel {
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-}
-
 .map-panel {
+  position: absolute;
+  inset: 0;
   display: grid;
   grid-template-rows: auto minmax(260px, 1fr) auto;
-  gap: 12px;
+  gap: 10px;
   padding: 14px;
-  position: sticky;
-  top: 16px;
-  align-self: start;
-  max-height: calc(100vh - 32px);
-  z-index: 2;
+  z-index: 1;
 }
 
 .loading-overlay {
@@ -112,6 +99,15 @@ button:hover, .segmented.is-active {
   gap: 12px;
 }
 
+.hud {
+  pointer-events: none;
+}
+
+.hud .actions,
+.hud button {
+  pointer-events: auto;
+}
+
 h1 {
   margin: 0 0 4px;
   font-size: clamp(1.35rem, 4vw, 2rem);
@@ -130,13 +126,10 @@ p {
 
 #globe-stage {
   width: 100%;
-  max-width: min(100%, 82vh);
-  aspect-ratio: 1;
-  justify-self: center;
-  align-self: center;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #0b1119;
+  height: 100%;
+  min-height: 300px;
+  border-radius: 12px;
+  background: radial-gradient(circle at 20% 15%, #123152 0%, #071122 45%, #04080f 100%);
   touch-action: manipulation;
 }
 
@@ -174,15 +167,47 @@ p {
 }
 
 .control-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 14px;
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: min(420px, calc(100vw - 28px));
+  max-height: calc(100vh - 150px);
   overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(25, 32, 37, 0.86);
+  backdrop-filter: blur(8px);
+  z-index: 4;
+}
+
+.advanced-panel {
+  padding: 10px 12px 12px;
+}
+
+.advanced-panel > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+  list-style: none;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.advanced-panel > summary::-webkit-details-marker {
+  display: none;
 }
 
 .actions button, .save-row button {
   flex: 1;
+}
+
+.primary-action {
+  min-width: 132px;
+  background: #ff7c39;
+  border-color: #ffb07f;
+  color: #ffffff;
+  font-weight: 700;
 }
 
 .control-grid {
@@ -276,18 +301,8 @@ input[type="range"] {
 }
 
 @media (max-width: 860px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
-    padding: 10px;
-  }
-
   .map-panel {
-    min-height: auto;
-    top: 10px;
-    max-height: calc(100vh - 20px);
+    inset: 0;
     gap: 8px;
     padding: 10px;
   }
@@ -301,19 +316,22 @@ input[type="range"] {
     font-size: 0.78rem;
   }
 
-  .topbar {
-    flex-direction: column;
-  }
-
   .actions {
     width: 100%;
   }
 
   #globe-stage {
-    max-width: clamp(260px, 72vw, 320px);
+    min-height: 240px;
   }
 
   .control-panel {
-    overflow: visible;
+    right: 10px;
+    bottom: 10px;
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 190px);
+  }
+
+  .toggle-grid {
+    grid-template-columns: 1fr;
   }
 }

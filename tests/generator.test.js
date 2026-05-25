@@ -39,11 +39,18 @@ test('legacy continentScale normalizes into landmassFrequency', () => {
   assert.equal(settings.landmassFrequency, 2.1);
 });
 
+test('legacy showClouds migrates into cloudCoverage', () => {
+  const hidden = generator.normalizeSettings({ showClouds: 0 });
+  const visible = generator.normalizeSettings({ showClouds: 1 });
+  assert.equal(hidden.cloudCoverage, 0);
+  assert.equal(visible.cloudCoverage, 0.55);
+});
+
 test('planet feature toggles are normalized as binary flags', () => {
-  const settings = generator.normalizeSettings({ showRings: 7, showMoons: -1, showClouds: 0, showFish: 1, playfulPalette: 3 });
+  const settings = generator.normalizeSettings({ showRings: 7, showMoons: -1, showClouds: 0, showFish: 1, playfulPalette: 3, cloudCoverage: 2 });
   assert.equal(settings.showRings, 1);
   assert.equal(settings.showMoons, 0);
-  assert.equal(settings.showClouds, 0);
+  assert.equal(settings.cloudCoverage, 1);
   assert.equal(settings.showFish, 1);
   assert.equal(settings.playfulPalette, 1);
 });

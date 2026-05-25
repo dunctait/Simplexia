@@ -10,8 +10,8 @@
     result: null
   };
 
-  const controlIds = ['resolution', 'landmassFrequency', 'surfaceScale', 'octaves', 'roughness', 'seaLevel', 'beachLevel', 'mountainLevel', 'seed'];
-  const toggleIds = ['playfulPalette', 'showClouds', 'showRings', 'showMoons', 'showFish'];
+  const controlIds = ['resolution', 'landmassFrequency', 'surfaceScale', 'octaves', 'roughness', 'seaLevel', 'cloudCoverage', 'beachLevel', 'mountainLevel', 'seed'];
+  const toggleIds = ['playfulPalette', 'showRings', 'showMoons', 'showFish'];
   const ids = [...controlIds, ...toggleIds, 'biomePreset', 'summary', 'legend', 'toast', 'saveName', 'savedList', 'generation-loading'];
   const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
   const outputs = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(`${id}Out`)]));

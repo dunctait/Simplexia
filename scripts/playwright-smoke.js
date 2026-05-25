@@ -20,6 +20,7 @@ async function main() {
     const stage = document.querySelector('#globe-stage');
     return stage && !stage.hidden && stage.querySelector('canvas');
   });
+  await page.evaluate(() => { document.querySelector('.advanced-panel').open = true; });
   await page.locator('#octaves').evaluate((input) => {
     input.value = '6';
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -88,8 +89,11 @@ async function main() {
   if (restoredSession.resolution !== 224 || restoredSession.octaves !== 6 || restoredSession.biomePreset !== 'arctic') {
     throw new Error(`Session did not restore after refresh: ${JSON.stringify(restoredSession)}`);
   }
-  await page.locator('#saveName').fill('Smoke island');
-  await page.locator('#save').click();
+  await page.evaluate(() => {
+    document.querySelector('.advanced-panel').open = true;
+    document.querySelector('#saveName').value = 'Smoke island';
+    document.querySelector('#save').click();
+  });
   await page.waitForFunction(() => document.querySelector('#savedList').options.length > 0);
 
   const globeInfo = await page.evaluate(() => {

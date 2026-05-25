@@ -5,7 +5,8 @@ export function createGlobeScene(container, generator) {
   scene.background = new THREE.Color(0x081229);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-  camera.position.set(0, 0.2, 5.5);
+  let cameraDistance = 5.5;
+  camera.position.set(0, 0.2, cameraDistance);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -24,25 +25,48 @@ export function createGlobeScene(container, generator) {
   let rings = null;
   let moons = [];
   let fish = [];
+  let towns = [];
+  let animals = [];
+  let fishJumpData = [];
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
   let velocityX = 0;
   let velocityY = 0;
+  const pointers = new Map();
+  let pinchDistance = 0;
   const rotation = { x: -0.2, y: -0.45 };
 
   container.addEventListener('touchmove', (event) => event.preventDefault(), { passive: false });
+  container.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    applyZoom(event.deltaY * 0.0022);
+  }, { passive: false });
   container.addEventListener('pointerdown', (event) => {
     event.preventDefault();
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     dragging = true;
-    velocityX = 0;
-    velocityY = 0;
     lastX = event.clientX;
     lastY = event.clientY;
+    velocityX = 0;
+    velocityY = 0;
     container.setPointerCapture(event.pointerId);
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
+    }
   });
   container.addEventListener('pointermove', (event) => {
-    if (!dragging || !mesh) return;
+    if (!mesh) return;
+    if (pointers.has(event.pointerId)) pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const nextDistance = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchDistance > 0) applyZoom((pinchDistance - nextDistance) * 0.0065);
+      pinchDistance = nextDistance;
+      return;
+    }
+    if (!dragging) return;
     event.preventDefault();
     const dx = event.clientX - lastX;
     const dy = event.clientY - lastY;
@@ -54,23 +78,33 @@ export function createGlobeScene(container, generator) {
     lastY = event.clientY;
     draw();
   });
-  container.addEventListener('pointerup', () => { dragging = false; });
-  container.addEventListener('pointercancel', () => { dragging = false; });
+  container.addEventListener('pointerup', (event) => {
+    pointers.delete(event.pointerId);
+    dragging = pointers.size > 0;
+    if (pointers.size < 2) pinchDistance = 0;
+  });
+  container.addEventListener('pointercancel', (event) => {
+    pointers.delete(event.pointerId);
+    dragging = pointers.size > 0;
+    if (pointers.size < 2) pinchDistance = 0;
+  });
+
+  function applyZoom(delta) {
+    cameraDistance = Math.max(3.3, Math.min(8.6, cameraDistance + delta));
+    camera.position.z = cameraDistance;
+    camera.updateProjectionMatrix();
+    draw();
+  }
 
   function render(result) {
     resize();
     clearPlanet();
-
-    const geometry = createTerrainSphere(result, generator);
+    const { geometry, markers } = createTerrainSphere(result, generator);
     const segments = resolutionSegments(result);
     const settings = result.settings;
     const playful = Boolean(settings.playfulPalette);
 
-    mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.82,
-      metalness: 0
-    }));
+    mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0 }));
     ocean = new THREE.Mesh(
       new THREE.SphereGeometry(1.552, segments, Math.max(48, Math.round(segments * 0.62))),
       new THREE.MeshPhysicalMaterial({
@@ -87,24 +121,25 @@ export function createGlobeScene(container, generator) {
     atmosphere = new THREE.Mesh(
       new THREE.SphereGeometry(1.64, segments, Math.max(48, Math.round(segments * 0.62))),
       new THREE.MeshBasicMaterial({
-        color: playful ? 0x92d8ff : 0x7fb7ff,
+        color: 0x9dd7ff,
         transparent: true,
-        opacity: playful ? 0.2 : 0.13,
+        opacity: 0.11,
         blending: THREE.AdditiveBlending,
         side: THREE.BackSide,
         depthWrite: false
       })
     );
-    if (settings.showClouds) clouds = createCloudLayer(segments, settings.seed);
+    if (settings.cloudCoverage > 0.01) clouds = createCloudLayer(segments, settings.seed, settings.cloudCoverage);
     if (settings.showRings) rings = createRings(playful);
     if (settings.showMoons) moons = createMoons(playful);
-    if (settings.showFish) fish = createFish(playful);
+    if (settings.showFish) ({ fish, fishJumpData } = createSeaFish(markers.sea, playful, settings.seed));
+    towns = createTowns(markers.landByBiome[1], markers.landByBiome[2], playful, settings.seed);
+    animals = createLandAnimals(markers.landByBiome, playful, settings.seed);
 
     const rotatables = [mesh, ocean, atmosphere, clouds].filter(Boolean);
     rotatables.forEach((item) => item.rotation.set(rotation.x, rotation.y, 0));
     [mesh, ocean, atmosphere, clouds, rings].filter(Boolean).forEach((item) => scene.add(item));
-    moons.forEach((item) => scene.add(item.mesh));
-    fish.forEach((item) => scene.add(item.mesh));
+    [...towns, ...animals, ...fish, ...moons.map((item) => item.mesh)].forEach((item) => scene.add(item));
 
     container.dataset.resolution = String(result.settings.resolution);
     container.dataset.vertexCount = String(geometry.attributes.position.count);
@@ -112,21 +147,11 @@ export function createGlobeScene(container, generator) {
   }
 
   function clearPlanet() {
-    [mesh, ocean, atmosphere, clouds, rings].forEach((item) => {
+    [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish, ...moons.map((item) => item.mesh)].forEach((item) => {
       if (!item) return;
-      item.geometry.dispose();
-      item.material.dispose();
+      if (item.geometry) item.geometry.dispose();
+      if (item.material) item.material.dispose();
       scene.remove(item);
-    });
-    moons.forEach((item) => {
-      item.mesh.geometry.dispose();
-      item.mesh.material.dispose();
-      scene.remove(item.mesh);
-    });
-    fish.forEach((item) => {
-      item.mesh.geometry.dispose();
-      item.mesh.material.dispose();
-      scene.remove(item.mesh);
     });
     mesh = null;
     ocean = null;
@@ -134,7 +159,10 @@ export function createGlobeScene(container, generator) {
     clouds = null;
     rings = null;
     moons = [];
+    towns = [];
+    animals = [];
     fish = [];
+    fishJumpData = [];
   }
 
   function resize() {
@@ -156,7 +184,7 @@ export function createGlobeScene(container, generator) {
 
   function animate() {
     if (mesh && !container.hidden) {
-      if (!dragging) {
+      if (!dragging && pointers.size < 2) {
         rotation.x += velocityX;
         rotation.y += velocityY || 0.0032;
         velocityX *= 0.94;
@@ -165,14 +193,22 @@ export function createGlobeScene(container, generator) {
         if (Math.abs(velocityY) < 0.0004) velocityY = 0;
       }
       const elapsed = performance.now() * 0.001;
-      if (clouds) clouds.rotation.y += 0.0008;
-      moons.forEach((moon, index) => {
+      if (clouds) clouds.rotation.y += 0.0012;
+      moons.forEach((moon) => {
         const phase = elapsed * moon.speed + moon.offset;
         moon.mesh.position.set(Math.cos(phase) * moon.radius, Math.sin(phase * 0.6) * moon.height, Math.sin(phase) * moon.radius);
       });
-      fish.forEach((item, index) => {
-        const phase = elapsed * item.speed + item.offset;
-        item.mesh.position.set(Math.cos(phase) * item.radius, Math.sin(phase * 2.2) * 0.12, Math.sin(phase) * item.radius);
+      fish.forEach((meshItem, index) => {
+        const jump = fishJumpData[index];
+        const t = elapsed * jump.speed + jump.offset;
+        const rise = Math.max(0, Math.sin(t));
+        const s = 1.558 + rise * jump.height;
+        meshItem.position.set(jump.normal.x * s, jump.normal.y * s, jump.normal.z * s);
+        meshItem.lookAt(meshItem.position.clone().add(jump.tangent));
+      });
+      animals.forEach((animal, index) => {
+        const bob = 0.007 * Math.sin(elapsed * (1.7 + index * 0.2) + index);
+        animal.position.multiplyScalar((1.566 + bob) / animal.position.length());
       });
       draw();
     }
@@ -194,29 +230,145 @@ function createTerrainSphere(result, generator) {
   const rawValues = [];
   const playful = Boolean(result.settings.playfulPalette);
   const palette = getPalette(result.settings.biomePreset, playful, generator.BIOME_PRESETS);
+  const markers = { sea: [], landByBiome: [[], [], [], []] };
 
-  for (let index = 0; index < position.count; index += 1) {
-    normal.set(position.getX(index), position.getY(index), position.getZ(index)).normalize();
+  for (let i = 0; i < position.count; i += 1) {
+    normal.set(position.getX(i), position.getY(i), position.getZ(i)).normalize();
     rawValues.push(sample(normal.x, normal.y, normal.z));
   }
   const low = percentile(rawValues, 0.02);
   const high = percentile(rawValues, 0.98);
 
-  for (let index = 0; index < position.count; index += 1) {
-    normal.set(position.getX(index), position.getY(index), position.getZ(index)).normalize();
-    const height = normalizeValue(rawValues[index], low, high);
+  for (let i = 0; i < position.count; i += 1) {
+    normal.set(position.getX(i), position.getY(i), position.getZ(i)).normalize();
+    const height = normalizeValue(rawValues[i], low, high);
     const biome = generator.classify(height, result.settings);
     const aboveSea = Math.max(0, height - result.settings.seaLevel);
     const elevation = biome === 0 ? -0.012 : 0.004 + aboveSea * 0.065 + Math.max(0, biome - 2) * 0.01;
-    position.setXYZ(index, normal.x * (1.55 + elevation), normal.y * (1.55 + elevation), normal.z * (1.55 + elevation));
+    const radius = 1.55 + elevation;
+    position.setXYZ(i, normal.x * radius, normal.y * radius, normal.z * radius);
     color.set(palette[biome]);
     const shade = biome === 0 ? 0.88 : 0.75 + height * 0.19;
     colors.push(color.r * shade, color.g * shade, color.b * shade);
+    if (i % 28 === 0) {
+      if (biome === 0) markers.sea.push(normal.clone());
+      else markers.landByBiome[biome].push(normal.clone());
+    }
   }
-
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
-  return geometry;
+  return { geometry, markers };
+}
+
+function createCloudLayer(segments, seed, coverage) {
+  const texture = createCloudTexture(seed, coverage);
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(1.592, segments, Math.max(48, Math.round(segments * 0.62))),
+    new THREE.MeshStandardMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 0.2 + coverage * 0.55,
+      depthWrite: false,
+      roughness: 0.95,
+      metalness: 0
+    })
+  );
+  return mesh;
+}
+
+function createCloudTexture(seed, coverage) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const random = seededRandom(seed + 97);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const puffs = Math.floor(220 + coverage * 520);
+  for (let i = 0; i < puffs; i += 1) {
+    const x = random() * canvas.width;
+    const y = random() * canvas.height;
+    const base = 8 + random() * (14 + coverage * 32);
+    const alpha = 0.1 + random() * (0.32 + coverage * 0.18);
+    ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+    for (let k = 0; k < 4; k += 1) {
+      ctx.beginPath();
+      ctx.ellipse(x + (random() - 0.5) * base, y + (random() - 0.5) * base, base * (0.55 + random() * 0.7), base * (0.4 + random() * 0.5), random() * Math.PI, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+function createSeaFish(seaNormals, playful, seed) {
+  const random = seededRandom(seed + 302);
+  const color = playful ? 0xff9b3d : 0x7cd7ff;
+  const fish = [];
+  const fishJumpData = [];
+  const total = Math.min(18, Math.max(6, Math.floor(seaNormals.length / 10)));
+  for (let i = 0; i < total; i += 1) {
+    const normal = seaNormals[Math.floor(random() * seaNormals.length)] || new THREE.Vector3(0, 1, 0);
+    const tangent = new THREE.Vector3().crossVectors(normal, new THREE.Vector3(0, 1, 0));
+    if (tangent.lengthSq() < 0.001) tangent.set(1, 0, 0);
+    tangent.normalize();
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.03, 0.09),
+      new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.06, emissive: color, emissiveIntensity: 0.14 })
+    );
+    fish.push(mesh);
+    fishJumpData.push({
+      normal,
+      tangent,
+      speed: 1.6 + random() * 1.9,
+      offset: random() * Math.PI * 2,
+      height: 0.06 + random() * 0.08
+    });
+  }
+  return { fish, fishJumpData };
+}
+
+function createTowns(beach, forest, playful, seed) {
+  const random = seededRandom(seed + 901);
+  const pool = [...beach.slice(0, 70), ...forest.slice(0, 70)];
+  const towns = [];
+  const baseColor = playful ? 0xf4e4c5 : 0xe1d5bf;
+  for (let i = 0; i < Math.min(16, pool.length); i += 1) {
+    const n = pool[Math.floor(random() * pool.length)];
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.04, 0.04),
+      new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.9, metalness: 0 })
+    );
+    const h = 1.565 + random() * 0.01;
+    mesh.position.set(n.x * h, n.y * h, n.z * h);
+    mesh.lookAt(mesh.position.clone().multiplyScalar(2));
+    towns.push(mesh);
+  }
+  return towns;
+}
+
+function createLandAnimals(landByBiome, playful, seed) {
+  const random = seededRandom(seed + 1401);
+  const animals = [];
+  const biomeColors = playful ? [0, 0xffd66f, 0x7dff87, 0xfff0f0] : [0, 0xc8b089, 0x80c072, 0xdad9de];
+  for (let biome = 1; biome <= 3; biome += 1) {
+    const points = landByBiome[biome];
+    const total = Math.min(10, points.length);
+    for (let i = 0; i < total; i += 1) {
+      const n = points[Math.floor(random() * points.length)];
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(0.035, 0.03, 0.05),
+        new THREE.MeshStandardMaterial({ color: biomeColors[biome], roughness: 0.7, metalness: 0 })
+      );
+      const h = 1.566 + random() * 0.008;
+      body.position.set(n.x * h, n.y * h, n.z * h);
+      body.lookAt(body.position.clone().multiplyScalar(2));
+      animals.push(body);
+    }
+  }
+  return animals;
 }
 
 function getPalette(presetId, playful, presets) {
@@ -232,84 +384,16 @@ function getPalette(presetId, playful, presets) {
 function createRings(playful) {
   return new THREE.Mesh(
     new THREE.RingGeometry(1.95, 2.72, 96),
-    new THREE.MeshStandardMaterial({
-      color: playful ? 0xffc871 : 0xcab59c,
-      transparent: true,
-      opacity: 0.48,
-      side: THREE.DoubleSide,
-      roughness: 0.84,
-      metalness: 0
-    })
+    new THREE.MeshStandardMaterial({ color: playful ? 0xffc871 : 0xcab59c, transparent: true, opacity: 0.48, side: THREE.DoubleSide, roughness: 0.84, metalness: 0 })
   );
-}
-
-function createCloudLayer(segments, seed) {
-  const texture = createCloudTexture(seed);
-  return new THREE.Mesh(
-    new THREE.SphereGeometry(1.59, segments, Math.max(48, Math.round(segments * 0.62))),
-    new THREE.MeshStandardMaterial({
-      map: texture,
-      transparent: true,
-      opacity: 0.55,
-      depthWrite: false,
-      roughness: 0.95,
-      metalness: 0
-    })
-  );
-}
-
-function createCloudTexture(seed) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  const random = seededRandom(seed + 97);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (let i = 0; i < 420; i += 1) {
-    const x = random() * canvas.width;
-    const y = random() * canvas.height;
-    const w = 12 + random() * 32;
-    const h = 6 + random() * 18;
-    const alpha = 0.18 + random() * 0.32;
-    ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
-    ctx.beginPath();
-    ctx.ellipse(x, y, w, h, random() * Math.PI, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  return texture;
 }
 
 function createMoons(playful) {
-  const moonMaterial = new THREE.MeshStandardMaterial({
-    color: playful ? 0xf6f2ff : 0xd9dde5,
-    roughness: 0.9,
-    metalness: 0
-  });
+  const moonMaterial = new THREE.MeshStandardMaterial({ color: playful ? 0xf6f2ff : 0xd9dde5, roughness: 0.9, metalness: 0 });
   return [
     { mesh: new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 18), moonMaterial.clone()), radius: 3.2, height: 0.42, speed: 0.42, offset: 0 },
     { mesh: new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), moonMaterial.clone()), radius: 2.7, height: -0.34, speed: -0.58, offset: Math.PI * 0.7 }
   ];
-}
-
-function createFish(playful) {
-  const color = playful ? 0xff9b3d : 0x7cd7ff;
-  const items = [];
-  for (let i = 0; i < 8; i += 1) {
-    items.push({
-      mesh: new THREE.Mesh(
-        new THREE.ConeGeometry(0.04, 0.12, 8),
-        new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.1, emissive: color, emissiveIntensity: 0.2 })
-      ),
-      radius: 1.75 + (i % 3) * 0.06,
-      speed: 0.4 + i * 0.05,
-      offset: i * 0.75
-    });
-    items[i].mesh.rotation.x = Math.PI / 2;
-  }
-  return items;
 }
 
 function createStars() {
@@ -319,11 +403,7 @@ function createStars() {
     const r = 16 + Math.random() * 20;
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    points.push(
-      r * Math.sin(phi) * Math.cos(theta),
-      r * Math.cos(phi),
-      r * Math.sin(phi) * Math.sin(theta)
-    );
+    points.push(r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
   }
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
   return new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.04, sizeAttenuation: true }));

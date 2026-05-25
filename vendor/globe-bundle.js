@@ -12485,193 +12485,6 @@ var IslandGlobeBundle = (() => {
       return new _BoxGeometry(data.width, data.height, data.depth, data.widthSegments, data.heightSegments, data.depthSegments);
     }
   };
-  var CylinderGeometry = class _CylinderGeometry extends BufferGeometry {
-    /**
-     * Constructs a new cylinder geometry.
-     *
-     * @param {number} [radiusTop=1] - Radius of the cylinder at the top.
-     * @param {number} [radiusBottom=1] - Radius of the cylinder at the bottom.
-     * @param {number} [height=1] - Height of the cylinder.
-     * @param {number} [radialSegments=32] - Number of segmented faces around the circumference of the cylinder.
-     * @param {number} [heightSegments=1] - Number of rows of faces along the height of the cylinder.
-     * @param {boolean} [openEnded=false] - Whether the base of the cylinder is open or capped.
-     * @param {number} [thetaStart=0] - Start angle for first segment, in radians.
-     * @param {number} [thetaLength=Math.PI*2] - The central angle, often called theta, of the circular sector, in radians.
-     * The default value results in a complete cylinder.
-     */
-    constructor(radiusTop = 1, radiusBottom = 1, height = 1, radialSegments = 32, heightSegments = 1, openEnded = false, thetaStart = 0, thetaLength = Math.PI * 2) {
-      super();
-      this.type = "CylinderGeometry";
-      this.parameters = {
-        radiusTop,
-        radiusBottom,
-        height,
-        radialSegments,
-        heightSegments,
-        openEnded,
-        thetaStart,
-        thetaLength
-      };
-      const scope = this;
-      radialSegments = Math.floor(radialSegments);
-      heightSegments = Math.floor(heightSegments);
-      const indices = [];
-      const vertices = [];
-      const normals = [];
-      const uvs = [];
-      let index = 0;
-      const indexArray = [];
-      const halfHeight = height / 2;
-      let groupStart = 0;
-      generateTorso();
-      if (openEnded === false) {
-        if (radiusTop > 0) generateCap(true);
-        if (radiusBottom > 0) generateCap(false);
-      }
-      this.setIndex(indices);
-      this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
-      this.setAttribute("normal", new Float32BufferAttribute(normals, 3));
-      this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
-      function generateTorso() {
-        const normal = new Vector3();
-        const vertex2 = new Vector3();
-        let groupCount = 0;
-        const slope = (radiusBottom - radiusTop) / height;
-        for (let y = 0; y <= heightSegments; y++) {
-          const indexRow = [];
-          const v = y / heightSegments;
-          const radius = v * (radiusBottom - radiusTop) + radiusTop;
-          for (let x = 0; x <= radialSegments; x++) {
-            const u = x / radialSegments;
-            const theta = u * thetaLength + thetaStart;
-            const sinTheta = Math.sin(theta);
-            const cosTheta = Math.cos(theta);
-            vertex2.x = radius * sinTheta;
-            vertex2.y = -v * height + halfHeight;
-            vertex2.z = radius * cosTheta;
-            vertices.push(vertex2.x, vertex2.y, vertex2.z);
-            normal.set(sinTheta, slope, cosTheta).normalize();
-            normals.push(normal.x, normal.y, normal.z);
-            uvs.push(u, 1 - v);
-            indexRow.push(index++);
-          }
-          indexArray.push(indexRow);
-        }
-        for (let x = 0; x < radialSegments; x++) {
-          for (let y = 0; y < heightSegments; y++) {
-            const a = indexArray[y][x];
-            const b = indexArray[y + 1][x];
-            const c = indexArray[y + 1][x + 1];
-            const d = indexArray[y][x + 1];
-            if (radiusTop > 0 || y !== 0) {
-              indices.push(a, b, d);
-              groupCount += 3;
-            }
-            if (radiusBottom > 0 || y !== heightSegments - 1) {
-              indices.push(b, c, d);
-              groupCount += 3;
-            }
-          }
-        }
-        scope.addGroup(groupStart, groupCount, 0);
-        groupStart += groupCount;
-      }
-      function generateCap(top) {
-        const centerIndexStart = index;
-        const uv = new Vector2();
-        const vertex2 = new Vector3();
-        let groupCount = 0;
-        const radius = top === true ? radiusTop : radiusBottom;
-        const sign = top === true ? 1 : -1;
-        for (let x = 1; x <= radialSegments; x++) {
-          vertices.push(0, halfHeight * sign, 0);
-          normals.push(0, sign, 0);
-          uvs.push(0.5, 0.5);
-          index++;
-        }
-        const centerIndexEnd = index;
-        for (let x = 0; x <= radialSegments; x++) {
-          const u = x / radialSegments;
-          const theta = u * thetaLength + thetaStart;
-          const cosTheta = Math.cos(theta);
-          const sinTheta = Math.sin(theta);
-          vertex2.x = radius * sinTheta;
-          vertex2.y = halfHeight * sign;
-          vertex2.z = radius * cosTheta;
-          vertices.push(vertex2.x, vertex2.y, vertex2.z);
-          normals.push(0, sign, 0);
-          uv.x = cosTheta * 0.5 + 0.5;
-          uv.y = sinTheta * 0.5 * sign + 0.5;
-          uvs.push(uv.x, uv.y);
-          index++;
-        }
-        for (let x = 0; x < radialSegments; x++) {
-          const c = centerIndexStart + x;
-          const i = centerIndexEnd + x;
-          if (top === true) {
-            indices.push(i, i + 1, c);
-          } else {
-            indices.push(i + 1, i, c);
-          }
-          groupCount += 3;
-        }
-        scope.addGroup(groupStart, groupCount, top === true ? 1 : 2);
-        groupStart += groupCount;
-      }
-    }
-    copy(source) {
-      super.copy(source);
-      this.parameters = Object.assign({}, source.parameters);
-      return this;
-    }
-    /**
-     * Factory method for creating an instance of this class from the given
-     * JSON object.
-     *
-     * @param {Object} data - A JSON object representing the serialized geometry.
-     * @return {CylinderGeometry} A new instance.
-     */
-    static fromJSON(data) {
-      return new _CylinderGeometry(data.radiusTop, data.radiusBottom, data.height, data.radialSegments, data.heightSegments, data.openEnded, data.thetaStart, data.thetaLength);
-    }
-  };
-  var ConeGeometry = class _ConeGeometry extends CylinderGeometry {
-    /**
-     * Constructs a new cone geometry.
-     *
-     * @param {number} [radius=1] - Radius of the cone base.
-     * @param {number} [height=1] - Height of the cone.
-     * @param {number} [radialSegments=32] - Number of segmented faces around the circumference of the cone.
-     * @param {number} [heightSegments=1] - Number of rows of faces along the height of the cone.
-     * @param {boolean} [openEnded=false] - Whether the base of the cone is open or capped.
-     * @param {number} [thetaStart=0] - Start angle for first segment, in radians.
-     * @param {number} [thetaLength=Math.PI*2] - The central angle, often called theta, of the circular sector, in radians.
-     * The default value results in a complete cone.
-     */
-    constructor(radius = 1, height = 1, radialSegments = 32, heightSegments = 1, openEnded = false, thetaStart = 0, thetaLength = Math.PI * 2) {
-      super(0, radius, height, radialSegments, heightSegments, openEnded, thetaStart, thetaLength);
-      this.type = "ConeGeometry";
-      this.parameters = {
-        radius,
-        height,
-        radialSegments,
-        heightSegments,
-        openEnded,
-        thetaStart,
-        thetaLength
-      };
-    }
-    /**
-     * Factory method for creating an instance of this class from the given
-     * JSON object.
-     *
-     * @param {Object} data - A JSON object representing the serialized geometry.
-     * @return {ConeGeometry} A new instance.
-     */
-    static fromJSON(data) {
-      return new _ConeGeometry(data.radius, data.height, data.radialSegments, data.heightSegments, data.openEnded, data.thetaStart, data.thetaLength);
-    }
-  };
   var PlaneGeometry = class _PlaneGeometry extends BufferGeometry {
     /**
      * Constructs a new plane geometry.
@@ -27335,7 +27148,8 @@ void main() {
     const scene = new Scene();
     scene.background = new Color(528937);
     const camera = new PerspectiveCamera(42, 1, 0.1, 100);
-    camera.position.set(0, 0.2, 5.5);
+    let cameraDistance = 5.5;
+    camera.position.set(0, 0.2, cameraDistance);
     const renderer = new WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     container.replaceChildren(renderer.domElement);
@@ -27351,24 +27165,47 @@ void main() {
     let rings = null;
     let moons = [];
     let fish = [];
+    let towns = [];
+    let animals = [];
+    let fishJumpData = [];
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
     let velocityX = 0;
     let velocityY = 0;
+    const pointers = /* @__PURE__ */ new Map();
+    let pinchDistance = 0;
     const rotation = { x: -0.2, y: -0.45 };
     container.addEventListener("touchmove", (event) => event.preventDefault(), { passive: false });
+    container.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      applyZoom(event.deltaY * 22e-4);
+    }, { passive: false });
     container.addEventListener("pointerdown", (event) => {
       event.preventDefault();
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       dragging = true;
-      velocityX = 0;
-      velocityY = 0;
       lastX = event.clientX;
       lastY = event.clientY;
+      velocityX = 0;
+      velocityY = 0;
       container.setPointerCapture(event.pointerId);
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
+      }
     });
     container.addEventListener("pointermove", (event) => {
-      if (!dragging || !mesh) return;
+      if (!mesh) return;
+      if (pointers.has(event.pointerId)) pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        const nextDistance = Math.hypot(a.x - b.x, a.y - b.y);
+        if (pinchDistance > 0) applyZoom((pinchDistance - nextDistance) * 65e-4);
+        pinchDistance = nextDistance;
+        return;
+      }
+      if (!dragging) return;
       event.preventDefault();
       const dx = event.clientX - lastX;
       const dy = event.clientY - lastY;
@@ -27380,24 +27217,30 @@ void main() {
       lastY = event.clientY;
       draw();
     });
-    container.addEventListener("pointerup", () => {
-      dragging = false;
+    container.addEventListener("pointerup", (event) => {
+      pointers.delete(event.pointerId);
+      dragging = pointers.size > 0;
+      if (pointers.size < 2) pinchDistance = 0;
     });
-    container.addEventListener("pointercancel", () => {
-      dragging = false;
+    container.addEventListener("pointercancel", (event) => {
+      pointers.delete(event.pointerId);
+      dragging = pointers.size > 0;
+      if (pointers.size < 2) pinchDistance = 0;
     });
+    function applyZoom(delta) {
+      cameraDistance = Math.max(3.3, Math.min(8.6, cameraDistance + delta));
+      camera.position.z = cameraDistance;
+      camera.updateProjectionMatrix();
+      draw();
+    }
     function render(result) {
       resize();
       clearPlanet();
-      const geometry = createTerrainSphere(result, generator);
+      const { geometry, markers } = createTerrainSphere(result, generator);
       const segments = resolutionSegments(result);
       const settings = result.settings;
       const playful = Boolean(settings.playfulPalette);
-      mesh = new Mesh(geometry, new MeshStandardMaterial({
-        vertexColors: true,
-        roughness: 0.82,
-        metalness: 0
-      }));
+      mesh = new Mesh(geometry, new MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0 }));
       ocean = new Mesh(
         new SphereGeometry(1.552, segments, Math.max(48, Math.round(segments * 0.62))),
         new MeshPhysicalMaterial({
@@ -27414,43 +27257,34 @@ void main() {
       atmosphere = new Mesh(
         new SphereGeometry(1.64, segments, Math.max(48, Math.round(segments * 0.62))),
         new MeshBasicMaterial({
-          color: playful ? 9623807 : 8370175,
+          color: 10344447,
           transparent: true,
-          opacity: playful ? 0.2 : 0.13,
+          opacity: 0.11,
           blending: AdditiveBlending,
           side: BackSide,
           depthWrite: false
         })
       );
-      if (settings.showClouds) clouds = createCloudLayer(segments, settings.seed);
+      if (settings.cloudCoverage > 0.01) clouds = createCloudLayer(segments, settings.seed, settings.cloudCoverage);
       if (settings.showRings) rings = createRings(playful);
       if (settings.showMoons) moons = createMoons(playful);
-      if (settings.showFish) fish = createFish(playful);
+      if (settings.showFish) ({ fish, fishJumpData } = createSeaFish(markers.sea, playful, settings.seed));
+      towns = createTowns(markers.landByBiome[1], markers.landByBiome[2], playful, settings.seed);
+      animals = createLandAnimals(markers.landByBiome, playful, settings.seed);
       const rotatables = [mesh, ocean, atmosphere, clouds].filter(Boolean);
       rotatables.forEach((item) => item.rotation.set(rotation.x, rotation.y, 0));
       [mesh, ocean, atmosphere, clouds, rings].filter(Boolean).forEach((item) => scene.add(item));
-      moons.forEach((item) => scene.add(item.mesh));
-      fish.forEach((item) => scene.add(item.mesh));
+      [...towns, ...animals, ...fish, ...moons.map((item) => item.mesh)].forEach((item) => scene.add(item));
       container.dataset.resolution = String(result.settings.resolution);
       container.dataset.vertexCount = String(geometry.attributes.position.count);
       draw();
     }
     function clearPlanet() {
-      [mesh, ocean, atmosphere, clouds, rings].forEach((item) => {
+      [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish, ...moons.map((item) => item.mesh)].forEach((item) => {
         if (!item) return;
-        item.geometry.dispose();
-        item.material.dispose();
+        if (item.geometry) item.geometry.dispose();
+        if (item.material) item.material.dispose();
         scene.remove(item);
-      });
-      moons.forEach((item) => {
-        item.mesh.geometry.dispose();
-        item.mesh.material.dispose();
-        scene.remove(item.mesh);
-      });
-      fish.forEach((item) => {
-        item.mesh.geometry.dispose();
-        item.mesh.material.dispose();
-        scene.remove(item.mesh);
       });
       mesh = null;
       ocean = null;
@@ -27458,7 +27292,10 @@ void main() {
       clouds = null;
       rings = null;
       moons = [];
+      towns = [];
+      animals = [];
       fish = [];
+      fishJumpData = [];
     }
     function resize() {
       const rect = container.getBoundingClientRect();
@@ -27477,7 +27314,7 @@ void main() {
     }
     function animate() {
       if (mesh && !container.hidden) {
-        if (!dragging) {
+        if (!dragging && pointers.size < 2) {
           rotation.x += velocityX;
           rotation.y += velocityY || 32e-4;
           velocityX *= 0.94;
@@ -27486,14 +27323,22 @@ void main() {
           if (Math.abs(velocityY) < 4e-4) velocityY = 0;
         }
         const elapsed = performance.now() * 1e-3;
-        if (clouds) clouds.rotation.y += 8e-4;
-        moons.forEach((moon, index) => {
+        if (clouds) clouds.rotation.y += 12e-4;
+        moons.forEach((moon) => {
           const phase = elapsed * moon.speed + moon.offset;
           moon.mesh.position.set(Math.cos(phase) * moon.radius, Math.sin(phase * 0.6) * moon.height, Math.sin(phase) * moon.radius);
         });
-        fish.forEach((item, index) => {
-          const phase = elapsed * item.speed + item.offset;
-          item.mesh.position.set(Math.cos(phase) * item.radius, Math.sin(phase * 2.2) * 0.12, Math.sin(phase) * item.radius);
+        fish.forEach((meshItem, index) => {
+          const jump = fishJumpData[index];
+          const t = elapsed * jump.speed + jump.offset;
+          const rise = Math.max(0, Math.sin(t));
+          const s = 1.558 + rise * jump.height;
+          meshItem.position.set(jump.normal.x * s, jump.normal.y * s, jump.normal.z * s);
+          meshItem.lookAt(meshItem.position.clone().add(jump.tangent));
+        });
+        animals.forEach((animal, index) => {
+          const bob = 7e-3 * Math.sin(elapsed * (1.7 + index * 0.2) + index);
+          animal.position.multiplyScalar((1.566 + bob) / animal.position.length());
         });
         draw();
       }
@@ -27513,26 +27358,138 @@ void main() {
     const rawValues = [];
     const playful = Boolean(result.settings.playfulPalette);
     const palette = getPalette(result.settings.biomePreset, playful, generator.BIOME_PRESETS);
-    for (let index = 0; index < position.count; index += 1) {
-      normal.set(position.getX(index), position.getY(index), position.getZ(index)).normalize();
+    const markers = { sea: [], landByBiome: [[], [], [], []] };
+    for (let i = 0; i < position.count; i += 1) {
+      normal.set(position.getX(i), position.getY(i), position.getZ(i)).normalize();
       rawValues.push(sample(normal.x, normal.y, normal.z));
     }
     const low = percentile(rawValues, 0.02);
     const high = percentile(rawValues, 0.98);
-    for (let index = 0; index < position.count; index += 1) {
-      normal.set(position.getX(index), position.getY(index), position.getZ(index)).normalize();
-      const height = normalizeValue(rawValues[index], low, high);
+    for (let i = 0; i < position.count; i += 1) {
+      normal.set(position.getX(i), position.getY(i), position.getZ(i)).normalize();
+      const height = normalizeValue(rawValues[i], low, high);
       const biome = generator.classify(height, result.settings);
       const aboveSea = Math.max(0, height - result.settings.seaLevel);
       const elevation = biome === 0 ? -0.012 : 4e-3 + aboveSea * 0.065 + Math.max(0, biome - 2) * 0.01;
-      position.setXYZ(index, normal.x * (1.55 + elevation), normal.y * (1.55 + elevation), normal.z * (1.55 + elevation));
+      const radius = 1.55 + elevation;
+      position.setXYZ(i, normal.x * radius, normal.y * radius, normal.z * radius);
       color.set(palette[biome]);
       const shade = biome === 0 ? 0.88 : 0.75 + height * 0.19;
       colors.push(color.r * shade, color.g * shade, color.b * shade);
+      if (i % 28 === 0) {
+        if (biome === 0) markers.sea.push(normal.clone());
+        else markers.landByBiome[biome].push(normal.clone());
+      }
     }
     geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
-    return geometry;
+    return { geometry, markers };
+  }
+  function createCloudLayer(segments, seed, coverage) {
+    const texture = createCloudTexture(seed, coverage);
+    const mesh = new Mesh(
+      new SphereGeometry(1.592, segments, Math.max(48, Math.round(segments * 0.62))),
+      new MeshStandardMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.2 + coverage * 0.55,
+        depthWrite: false,
+        roughness: 0.95,
+        metalness: 0
+      })
+    );
+    return mesh;
+  }
+  function createCloudTexture(seed, coverage) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    const random = seededRandom(seed + 97);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const puffs = Math.floor(220 + coverage * 520);
+    for (let i = 0; i < puffs; i += 1) {
+      const x = random() * canvas.width;
+      const y = random() * canvas.height;
+      const base = 8 + random() * (14 + coverage * 32);
+      const alpha = 0.1 + random() * (0.32 + coverage * 0.18);
+      ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+      for (let k = 0; k < 4; k += 1) {
+        ctx.beginPath();
+        ctx.ellipse(x + (random() - 0.5) * base, y + (random() - 0.5) * base, base * (0.55 + random() * 0.7), base * (0.4 + random() * 0.5), random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    const texture = new CanvasTexture(canvas);
+    texture.wrapS = RepeatWrapping;
+    texture.wrapT = RepeatWrapping;
+    texture.anisotropy = 4;
+    return texture;
+  }
+  function createSeaFish(seaNormals, playful, seed) {
+    const random = seededRandom(seed + 302);
+    const color = playful ? 16751421 : 8181759;
+    const fish = [];
+    const fishJumpData = [];
+    const total = Math.min(18, Math.max(6, Math.floor(seaNormals.length / 10)));
+    for (let i = 0; i < total; i += 1) {
+      const normal = seaNormals[Math.floor(random() * seaNormals.length)] || new Vector3(0, 1, 0);
+      const tangent = new Vector3().crossVectors(normal, new Vector3(0, 1, 0));
+      if (tangent.lengthSq() < 1e-3) tangent.set(1, 0, 0);
+      tangent.normalize();
+      const mesh = new Mesh(
+        new BoxGeometry(0.03, 0.03, 0.09),
+        new MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.06, emissive: color, emissiveIntensity: 0.14 })
+      );
+      fish.push(mesh);
+      fishJumpData.push({
+        normal,
+        tangent,
+        speed: 1.6 + random() * 1.9,
+        offset: random() * Math.PI * 2,
+        height: 0.06 + random() * 0.08
+      });
+    }
+    return { fish, fishJumpData };
+  }
+  function createTowns(beach, forest, playful, seed) {
+    const random = seededRandom(seed + 901);
+    const pool = [...beach.slice(0, 70), ...forest.slice(0, 70)];
+    const towns = [];
+    const baseColor = playful ? 16049349 : 14800319;
+    for (let i = 0; i < Math.min(16, pool.length); i += 1) {
+      const n = pool[Math.floor(random() * pool.length)];
+      const mesh = new Mesh(
+        new BoxGeometry(0.04, 0.04, 0.04),
+        new MeshStandardMaterial({ color: baseColor, roughness: 0.9, metalness: 0 })
+      );
+      const h = 1.565 + random() * 0.01;
+      mesh.position.set(n.x * h, n.y * h, n.z * h);
+      mesh.lookAt(mesh.position.clone().multiplyScalar(2));
+      towns.push(mesh);
+    }
+    return towns;
+  }
+  function createLandAnimals(landByBiome, playful, seed) {
+    const random = seededRandom(seed + 1401);
+    const animals = [];
+    const biomeColors = playful ? [0, 16766575, 8257415, 16773360] : [0, 13152393, 8437874, 14342622];
+    for (let biome = 1; biome <= 3; biome += 1) {
+      const points = landByBiome[biome];
+      const total = Math.min(10, points.length);
+      for (let i = 0; i < total; i += 1) {
+        const n = points[Math.floor(random() * points.length)];
+        const body = new Mesh(
+          new BoxGeometry(0.035, 0.03, 0.05),
+          new MeshStandardMaterial({ color: biomeColors[biome], roughness: 0.7, metalness: 0 })
+        );
+        const h = 1.566 + random() * 8e-3;
+        body.position.set(n.x * h, n.y * h, n.z * h);
+        body.lookAt(body.position.clone().multiplyScalar(2));
+        animals.push(body);
+      }
+    }
+    return animals;
   }
   function getPalette(presetId, playful, presets) {
     if (!playful) return presets[presetId].biomes.map((biome) => biome.color);
@@ -27546,80 +27503,15 @@ void main() {
   function createRings(playful) {
     return new Mesh(
       new RingGeometry(1.95, 2.72, 96),
-      new MeshStandardMaterial({
-        color: playful ? 16762993 : 13284764,
-        transparent: true,
-        opacity: 0.48,
-        side: DoubleSide,
-        roughness: 0.84,
-        metalness: 0
-      })
+      new MeshStandardMaterial({ color: playful ? 16762993 : 13284764, transparent: true, opacity: 0.48, side: DoubleSide, roughness: 0.84, metalness: 0 })
     );
-  }
-  function createCloudLayer(segments, seed) {
-    const texture = createCloudTexture(seed);
-    return new Mesh(
-      new SphereGeometry(1.59, segments, Math.max(48, Math.round(segments * 0.62))),
-      new MeshStandardMaterial({
-        map: texture,
-        transparent: true,
-        opacity: 0.55,
-        depthWrite: false,
-        roughness: 0.95,
-        metalness: 0
-      })
-    );
-  }
-  function createCloudTexture(seed) {
-    const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 128;
-    const ctx = canvas.getContext("2d");
-    const random = seededRandom(seed + 97);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (let i = 0; i < 420; i += 1) {
-      const x = random() * canvas.width;
-      const y = random() * canvas.height;
-      const w = 12 + random() * 32;
-      const h = 6 + random() * 18;
-      const alpha = 0.18 + random() * 0.32;
-      ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
-      ctx.beginPath();
-      ctx.ellipse(x, y, w, h, random() * Math.PI, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    const texture = new CanvasTexture(canvas);
-    texture.wrapS = RepeatWrapping;
-    texture.wrapT = RepeatWrapping;
-    return texture;
   }
   function createMoons(playful) {
-    const moonMaterial = new MeshStandardMaterial({
-      color: playful ? 16184063 : 14278117,
-      roughness: 0.9,
-      metalness: 0
-    });
+    const moonMaterial = new MeshStandardMaterial({ color: playful ? 16184063 : 14278117, roughness: 0.9, metalness: 0 });
     return [
       { mesh: new Mesh(new SphereGeometry(0.16, 24, 18), moonMaterial.clone()), radius: 3.2, height: 0.42, speed: 0.42, offset: 0 },
       { mesh: new Mesh(new SphereGeometry(0.1, 20, 16), moonMaterial.clone()), radius: 2.7, height: -0.34, speed: -0.58, offset: Math.PI * 0.7 }
     ];
-  }
-  function createFish(playful) {
-    const color = playful ? 16751421 : 8181759;
-    const items = [];
-    for (let i = 0; i < 8; i += 1) {
-      items.push({
-        mesh: new Mesh(
-          new ConeGeometry(0.04, 0.12, 8),
-          new MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.1, emissive: color, emissiveIntensity: 0.2 })
-        ),
-        radius: 1.75 + i % 3 * 0.06,
-        speed: 0.4 + i * 0.05,
-        offset: i * 0.75
-      });
-      items[i].mesh.rotation.x = Math.PI / 2;
-    }
-    return items;
   }
   function createStars() {
     const geometry = new BufferGeometry();
@@ -27628,11 +27520,7 @@ void main() {
       const r = 16 + Math.random() * 20;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      points.push(
-        r * Math.sin(phi) * Math.cos(theta),
-        r * Math.cos(phi),
-        r * Math.sin(phi) * Math.sin(theta)
-      );
+      points.push(r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
     }
     geometry.setAttribute("position", new Float32BufferAttribute(points, 3));
     return new Points(geometry, new PointsMaterial({ color: 16777215, size: 0.04, sizeAttenuation: true }));
