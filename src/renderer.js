@@ -10,7 +10,11 @@
       return result;
     }
 
-    return { render, resize: () => globe.resize() };
+    return {
+      render,
+      resize: () => globe.resize(),
+      setAutoSpin: (enabled) => globe.setAutoSpin && globe.setAutoSpin(enabled)
+    };
   }
 
   return { createRenderer };

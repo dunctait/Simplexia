@@ -27158,6 +27158,8 @@ void main() {
     scene.add(key);
     scene.add(new HemisphereLight(13956607, 1187890, 0.86));
     scene.add(createStars());
+    const planetGroup = new Group();
+    scene.add(planetGroup);
     let mesh = null;
     let ocean = null;
     let atmosphere = null;
@@ -27173,6 +27175,7 @@ void main() {
     let lastY = 0;
     let velocityX = 0;
     let velocityY = 0;
+    let autoSpin = true;
     const pointers = /* @__PURE__ */ new Map();
     let pinchDistance = 0;
     const rotation = { x: -0.2, y: -0.45 };
@@ -27209,6 +27212,7 @@ void main() {
       event.preventDefault();
       const dx = event.clientX - lastX;
       const dy = event.clientY - lastY;
+      if (dx !== 0 || dy !== 0) autoSpin = false;
       velocityY = dx * 0.018;
       velocityX = dy * 0.014;
       rotation.y += velocityY;
@@ -27228,6 +27232,7 @@ void main() {
       if (pointers.size < 2) pinchDistance = 0;
     });
     function applyZoom(delta) {
+      if (Math.abs(delta) > 1e-5) autoSpin = false;
       cameraDistance = Math.max(3.3, Math.min(8.6, cameraDistance + delta));
       camera.position.z = cameraDistance;
       camera.updateProjectionMatrix();
@@ -27271,16 +27276,20 @@ void main() {
       if (settings.showFish) ({ fish, fishJumpData } = createSeaFish(markers.sea, playful, settings.seed));
       towns = createTowns(markers.landByBiome[1], markers.landByBiome[2], playful, settings.seed);
       animals = createLandAnimals(markers.landByBiome, playful, settings.seed);
-      const rotatables = [mesh, ocean, atmosphere, clouds].filter(Boolean);
-      rotatables.forEach((item) => item.rotation.set(rotation.x, rotation.y, 0));
-      [mesh, ocean, atmosphere, clouds, rings].filter(Boolean).forEach((item) => scene.add(item));
-      [...towns, ...animals, ...fish, ...moons.map((item) => item.mesh)].forEach((item) => scene.add(item));
+      [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish].filter(Boolean).forEach((item) => planetGroup.add(item));
+      moons.map((item) => item.mesh).forEach((item) => scene.add(item));
       container.dataset.resolution = String(result.settings.resolution);
       container.dataset.vertexCount = String(geometry.attributes.position.count);
       draw();
     }
     function clearPlanet() {
-      [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish, ...moons.map((item) => item.mesh)].forEach((item) => {
+      [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish].forEach((item) => {
+        if (!item) return;
+        if (item.geometry) item.geometry.dispose();
+        if (item.material) item.material.dispose();
+        planetGroup.remove(item);
+      });
+      moons.map((item) => item.mesh).forEach((item) => {
         if (!item) return;
         if (item.geometry) item.geometry.dispose();
         if (item.material) item.material.dispose();
@@ -27306,17 +27315,15 @@ void main() {
     }
     function draw() {
       if (!mesh) return;
-      [mesh, ocean, atmosphere, clouds, rings].filter(Boolean).forEach((item) => {
-        item.rotation.x = rotation.x;
-        item.rotation.y = rotation.y;
-      });
+      planetGroup.rotation.x = rotation.x;
+      planetGroup.rotation.y = rotation.y;
       renderer.render(scene, camera);
     }
     function animate() {
       if (mesh && !container.hidden) {
         if (!dragging && pointers.size < 2) {
           rotation.x += velocityX;
-          rotation.y += velocityY || 32e-4;
+          rotation.y += velocityY || (autoSpin ? 32e-4 : 0);
           velocityX *= 0.94;
           velocityY *= 0.94;
           if (Math.abs(velocityX) < 4e-4) velocityX = 0;
@@ -27345,7 +27352,13 @@ void main() {
       requestAnimationFrame(animate);
     }
     animate();
-    return { render, resize };
+    return {
+      render,
+      resize,
+      setAutoSpin(enabled) {
+        autoSpin = Boolean(enabled);
+      }
+    };
   }
   function createTerrainSphere(result, generator) {
     const segments = resolutionSegments(result);

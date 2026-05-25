@@ -72,6 +72,7 @@
       state.settings = generator.normalizeSettings();
       syncControls();
       persistSession();
+      if (renderer && renderer.setAutoSpin) renderer.setAutoSpin(true);
       regenerateNow();
     });
     document.getElementById('copy-export').addEventListener('click', copyExport);

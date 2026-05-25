@@ -17,6 +17,8 @@ export function createGlobeScene(container, generator) {
   scene.add(key);
   scene.add(new THREE.HemisphereLight(0xd4f5ff, 0x122032, 0.86));
   scene.add(createStars());
+  const planetGroup = new THREE.Group();
+  scene.add(planetGroup);
 
   let mesh = null;
   let ocean = null;
@@ -33,6 +35,7 @@ export function createGlobeScene(container, generator) {
   let lastY = 0;
   let velocityX = 0;
   let velocityY = 0;
+  let autoSpin = true;
   const pointers = new Map();
   let pinchDistance = 0;
   const rotation = { x: -0.2, y: -0.45 };
@@ -70,6 +73,7 @@ export function createGlobeScene(container, generator) {
     event.preventDefault();
     const dx = event.clientX - lastX;
     const dy = event.clientY - lastY;
+    if (dx !== 0 || dy !== 0) autoSpin = false;
     velocityY = dx * 0.018;
     velocityX = dy * 0.014;
     rotation.y += velocityY;
@@ -90,6 +94,7 @@ export function createGlobeScene(container, generator) {
   });
 
   function applyZoom(delta) {
+    if (Math.abs(delta) > 0.00001) autoSpin = false;
     cameraDistance = Math.max(3.3, Math.min(8.6, cameraDistance + delta));
     camera.position.z = cameraDistance;
     camera.updateProjectionMatrix();
@@ -136,10 +141,8 @@ export function createGlobeScene(container, generator) {
     towns = createTowns(markers.landByBiome[1], markers.landByBiome[2], playful, settings.seed);
     animals = createLandAnimals(markers.landByBiome, playful, settings.seed);
 
-    const rotatables = [mesh, ocean, atmosphere, clouds].filter(Boolean);
-    rotatables.forEach((item) => item.rotation.set(rotation.x, rotation.y, 0));
-    [mesh, ocean, atmosphere, clouds, rings].filter(Boolean).forEach((item) => scene.add(item));
-    [...towns, ...animals, ...fish, ...moons.map((item) => item.mesh)].forEach((item) => scene.add(item));
+    [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish].filter(Boolean).forEach((item) => planetGroup.add(item));
+    moons.map((item) => item.mesh).forEach((item) => scene.add(item));
 
     container.dataset.resolution = String(result.settings.resolution);
     container.dataset.vertexCount = String(geometry.attributes.position.count);
@@ -147,7 +150,13 @@ export function createGlobeScene(container, generator) {
   }
 
   function clearPlanet() {
-    [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish, ...moons.map((item) => item.mesh)].forEach((item) => {
+    [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish].forEach((item) => {
+      if (!item) return;
+      if (item.geometry) item.geometry.dispose();
+      if (item.material) item.material.dispose();
+      planetGroup.remove(item);
+    });
+    moons.map((item) => item.mesh).forEach((item) => {
       if (!item) return;
       if (item.geometry) item.geometry.dispose();
       if (item.material) item.material.dispose();
@@ -175,10 +184,8 @@ export function createGlobeScene(container, generator) {
 
   function draw() {
     if (!mesh) return;
-    [mesh, ocean, atmosphere, clouds, rings].filter(Boolean).forEach((item) => {
-      item.rotation.x = rotation.x;
-      item.rotation.y = rotation.y;
-    });
+    planetGroup.rotation.x = rotation.x;
+    planetGroup.rotation.y = rotation.y;
     renderer.render(scene, camera);
   }
 
@@ -186,7 +193,7 @@ export function createGlobeScene(container, generator) {
     if (mesh && !container.hidden) {
       if (!dragging && pointers.size < 2) {
         rotation.x += velocityX;
-        rotation.y += velocityY || 0.0032;
+        rotation.y += velocityY || (autoSpin ? 0.0032 : 0);
         velocityX *= 0.94;
         velocityY *= 0.94;
         if (Math.abs(velocityX) < 0.0004) velocityX = 0;
@@ -216,7 +223,13 @@ export function createGlobeScene(container, generator) {
   }
   animate();
 
-  return { render, resize };
+  return {
+    render,
+    resize,
+    setAutoSpin(enabled) {
+      autoSpin = Boolean(enabled);
+    }
+  };
 }
 
 function createTerrainSphere(result, generator) {
