@@ -2,7 +2,7 @@
 
 ## Overview
 
-Simplex Islands is served directly by GitHub Pages. There is no build step; the source files in `index.html` and `src/` are the deployed app.
+Simplex Islands is served directly by GitHub Pages. The app itself is static, but `vendor/globe-bundle.js` is built from `src/globe-scene.js` and should be rebuilt before deploys.
 
 ## Commands
 
@@ -14,6 +14,8 @@ npm run predeploy
 ```
 
 `npm run check` runs the deterministic unit suite and Playwright E2E smoke checks. `npm run predeploy` adds repository hygiene checks such as script load order and `CLAUDE.md` convention validation.
+
+For a full local deploy on Windows, run `deploy.ps1` or `deploy.bat`. The script builds, tests, runs predeploy validation, commits any staged changes, and pushes to the `simplexia` remote on `master`.
 
 ## Deploy
 
