@@ -31,8 +31,15 @@ export function createGlobeScene(container, generator) {
   scene.add(createStars());
   const planetGroup = new THREE.Group();
   scene.add(planetGroup);
+  let lastResult = null;
+  let buildingRefreshTriggered = false;
   preloadFishPrototype();
-  preloadBuildingPrototypes();
+  preloadBuildingPrototypes().then(() => {
+    if (lastResult && !buildingRefreshTriggered) {
+      buildingRefreshTriggered = true;
+      render(lastResult);
+    }
+  });
 
   let mesh = null;
   let ocean = null;
@@ -131,6 +138,7 @@ export function createGlobeScene(container, generator) {
   }
 
   function render(result) {
+    lastResult = result;
     resize();
     clearPlanet();
     const { geometry, markers } = createTerrainSphere(result, generator);
@@ -168,6 +176,7 @@ export function createGlobeScene(container, generator) {
     if (settings.showMoons) moons = createMoons(playful);
     if (settings.showFish) ({ fish, fishJumpData } = createSeaFish(markers.sea, playful, settings.seed));
     towns = createTowns(markers.landByBiome[1], markers.landByBiome[2], playful, settings.seed);
+    if (buildingPrototypeGeometries.length) buildingRefreshTriggered = true;
     animals = createLandAnimals(markers.landByBiome, playful, settings.seed);
 
     [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish].filter(Boolean).forEach((item) => planetGroup.add(item));
