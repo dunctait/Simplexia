@@ -14,8 +14,7 @@
     edgeFade: 0.08,
     radialEnabled: true,
     biomePreset: 'classic',
-    seed: 0,
-    start: { x: 64, y: 64 }
+    seed: 0
   });
 
   const BIOME_PRESETS = Object.freeze({
@@ -49,7 +48,7 @@
   });
 
   function normalizeSettings(input = {}) {
-    const settings = { ...DEFAULT_SETTINGS, ...input, start: { ...DEFAULT_SETTINGS.start, ...(input.start || {}) } };
+    const settings = { ...DEFAULT_SETTINGS, ...input };
     settings.columns = clampInt(settings.columns, 48, 256);
     settings.rows = clampInt(settings.rows, 48, 256);
     settings.octaves = clampInt(settings.octaves, 1, 8);
@@ -62,8 +61,6 @@
     settings.mountainLevel = clampNumber(Math.max(settings.mountainLevel, settings.beachLevel + 0.01), 0.3, 0.95);
     settings.radialEnabled = Boolean(settings.radialEnabled);
     settings.biomePreset = BIOME_PRESETS[settings.biomePreset] ? settings.biomePreset : DEFAULT_SETTINGS.biomePreset;
-    settings.start.x = clampInt(settings.start.x, 0, settings.columns - 1);
-    settings.start.y = clampInt(settings.start.y, 0, settings.rows - 1);
     return settings;
   }
 
@@ -88,10 +85,6 @@
     if (settings.radialEnabled) applyRadialMask(values);
     applyEdgeMask(values, settings.edgeFade);
     normalize(values);
-
-    if (classify(values[settings.start.y][settings.start.x], settings) === 0) {
-      settings.start = findNearestLand(values, settings);
-    }
 
     return {
       settings,
@@ -154,22 +147,6 @@
       const factor = Math.min(1, edgeDistance / edgeFade);
       values[y][x] = value * factor;
     }));
-  }
-
-  function findNearestLand(values, settings) {
-    const cx = Math.floor(settings.columns / 2);
-    const cy = Math.floor(settings.rows / 2);
-    let best = { x: cx, y: cy };
-    let bestDistance = Infinity;
-    values.forEach((row, y) => row.forEach((value, x) => {
-      if (classify(value, settings) === 0) return;
-      const distance = (x - cx) ** 2 + (y - cy) ** 2;
-      if (distance < bestDistance) {
-        best = { x, y };
-        bestDistance = distance;
-      }
-    }));
-    return best;
   }
 
   function toExportString(settings) {

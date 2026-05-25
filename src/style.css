@@ -65,6 +65,11 @@ button:hover, .segmented.is-active {
   grid-template-rows: auto minmax(260px, 1fr) auto;
   gap: 12px;
   padding: 14px;
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  max-height: calc(100vh - 32px);
+  z-index: 2;
 }
 
 .topbar {
@@ -94,7 +99,8 @@ p {
   min-width: 74px;
 }
 
-#map-canvas {
+#map-canvas,
+#globe-stage {
   width: 100%;
   max-width: min(100%, 82vh);
   aspect-ratio: 1;
@@ -104,6 +110,21 @@ p {
   border-radius: 8px;
   background: #0b1119;
   touch-action: manipulation;
+}
+
+#map-canvas[hidden],
+#globe-stage[hidden] {
+  display: none;
+}
+
+#globe-stage {
+  overflow: hidden;
+}
+
+#globe-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .legend {
@@ -228,6 +249,8 @@ input[type="range"] {
 
   .map-panel {
     min-height: auto;
+    top: 10px;
+    max-height: calc(100vh - 20px);
   }
 
   .topbar {

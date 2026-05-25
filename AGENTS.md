@@ -24,7 +24,9 @@ npm run predeploy
 - `src/simplex-noise.js` ports the deterministic 2D simplex noise implementation.
 - `src/generator.js` owns terrain settings, map generation, masks, biome classification, summaries, and exports.
 - `src/storage.js` owns localStorage persistence and normalization.
-- `src/renderer.js` owns canvas rendering and pointer-to-tile conversion.
+- `src/renderer.js` owns 2D canvas rendering and delegates 3D globe rendering.
+- `src/globe-scene.js` owns the Three.js/WebGL globe scene.
+- `vendor/globe-bundle.js` is the browser-ready Three.js bundle generated from `src/globe-scene.js` with `npm run build:globe`.
 - `src/ui.js` owns DOM binding, state updates, save/load controls, and app orchestration.
 
 Boundary rules:
@@ -39,6 +41,7 @@ Boundary rules:
 - Touch targets must remain at least 40px high
 - Controls must not overlap the canvas or each other
 - Grid and globe modes must render from the same generated map data
+- Globe mode must remain a real Three.js/WebGL scene, not a 2D projection.
 
 ## Harness Notes
 

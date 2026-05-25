@@ -5,10 +5,9 @@ HTML5 simplex-noise island generator, ported from the original JavaFX experiment
 ## Phase 1
 
 - Responsive HTML5 canvas UI
-- Grid and globe preview modes
+- Grid preview and real 3D globe preview
 - Deterministic seed, octave, roughness, scale, threshold, radial mask, and edge fade controls
 - Biome presets
-- Click/tap to select a land start tile
 - Export current generation as JSON
 - Save/load generations in localStorage
 - Unit tests, Playwright E2E checks, and GitHub Actions CI

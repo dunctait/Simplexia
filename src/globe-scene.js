@@ -1,0 +1,138 @@
+import * as THREE from 'three';
+
+export function createGlobeScene(container, generator) {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b1119);
+
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0, 0.18, 4.6);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  container.replaceChildren(renderer.domElement);
+
+  const key = new THREE.DirectionalLight(0xffffff, 2.3);
+  key.position.set(3, 2, 4);
+  scene.add(key);
+  scene.add(new THREE.AmbientLight(0x9fb2bd, 1.15));
+
+  let mesh = null;
+  let texture = null;
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  const rotation = { x: -0.18, y: -0.45 };
+
+  container.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    container.setPointerCapture(event.pointerId);
+  });
+  container.addEventListener('pointermove', (event) => {
+    if (!dragging || !mesh) return;
+    rotation.y += (event.clientX - lastX) * 0.008;
+    rotation.x += (event.clientY - lastY) * 0.006;
+    rotation.x = Math.max(-1.1, Math.min(1.1, rotation.x));
+    lastX = event.clientX;
+    lastY = event.clientY;
+    draw();
+  });
+  container.addEventListener('pointerup', () => {
+    dragging = false;
+  });
+  container.addEventListener('pointercancel', () => {
+    dragging = false;
+  });
+
+  function render(result) {
+    resize();
+    if (mesh) {
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+      scene.remove(mesh);
+    }
+    if (texture) texture.dispose();
+
+    texture = createTerrainTexture(result, generator);
+    const geometry = createTerrainSphere(result);
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      roughness: 0.92,
+      metalness: 0,
+      flatShading: false
+    });
+    mesh = new THREE.Mesh(geometry, material);
+    mesh.rotation.set(rotation.x, rotation.y, 0);
+    scene.add(mesh);
+    draw();
+  }
+
+  function resize() {
+    const rect = container.getBoundingClientRect();
+    const size = Math.max(240, Math.floor(Math.min(rect.width, rect.height)));
+    renderer.setSize(size, size, false);
+    camera.aspect = 1;
+    camera.updateProjectionMatrix();
+  }
+
+  function draw() {
+    if (!mesh) return;
+    mesh.rotation.x = rotation.x;
+    mesh.rotation.y = rotation.y;
+    renderer.render(scene, camera);
+  }
+
+  function animate() {
+    if (mesh && !dragging && !container.hidden) {
+      rotation.y += 0.003;
+      draw();
+    }
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  return { render, resize };
+}
+
+function createTerrainTexture(result, generator) {
+  const { settings, values } = result;
+  const preset = generator.BIOME_PRESETS[settings.biomePreset];
+  const canvas = document.createElement('canvas');
+  canvas.width = settings.columns;
+  canvas.height = settings.rows;
+  const ctx = canvas.getContext('2d');
+  for (let y = 0; y < settings.rows; y += 1) {
+    for (let x = 0; x < settings.columns; x += 1) {
+      ctx.fillStyle = preset.biomes[generator.classify(values[y][x], settings)].color;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  return texture;
+}
+
+function createTerrainSphere(result) {
+  const geometry = new THREE.SphereGeometry(1.55, 128, 80);
+  const position = geometry.attributes.position;
+  const uv = geometry.attributes.uv;
+  const normal = new THREE.Vector3();
+  for (let index = 0; index < position.count; index += 1) {
+    const u = uv.getX(index);
+    const v = uv.getY(index);
+    const x = Math.min(result.settings.columns - 1, Math.max(0, Math.floor(u * result.settings.columns)));
+    const y = Math.min(result.settings.rows - 1, Math.max(0, Math.floor((1 - v) * result.settings.rows)));
+    const height = result.values[y][x];
+    const biome = height < result.settings.seaLevel ? 0 : height < result.settings.beachLevel ? 1 : height < result.settings.mountainLevel ? 2 : 3;
+    const elevation = biome === 0 ? -0.018 : 0.02 + height * 0.12 + biome * 0.018;
+    normal.set(position.getX(index), position.getY(index), position.getZ(index)).normalize();
+    position.setXYZ(index, normal.x * (1.55 + elevation), normal.y * (1.55 + elevation), normal.z * (1.55 + elevation));
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+}

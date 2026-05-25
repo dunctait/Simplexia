@@ -24,12 +24,6 @@ test('thresholds remain ordered when normalized', () => {
   assert.ok(settings.beachLevel < settings.mountainLevel);
 });
 
-test('start position is moved to land when requested tile is water', () => {
-  const result = generator.generate({ columns: 64, rows: 64, seed: 0, start: { x: 0, y: 0 } });
-  const startValue = result.values[result.settings.start.y][result.settings.start.x];
-  assert.notEqual(generator.classify(startValue, result.settings), 0);
-});
-
 test('export string contains serializable settings', () => {
   const result = generator.generate({ seed: 99 });
   const parsed = JSON.parse(result.exportString);

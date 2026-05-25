@@ -1,4 +1,7 @@
-(function () {
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.SimplexIslandsUi = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
   const generator = window.IslandGenerator;
   const storage = window.IslandStorage;
   const state = {
@@ -15,9 +18,15 @@
   ];
   const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
   const outputs = Object.fromEntries(['columns', 'rows', 'octaves', 'roughness', 'scale', 'seaLevel', 'beachLevel', 'mountainLevel', 'edgeFade', 'seed'].map((id) => [id, document.getElementById(`${id}Out`)]));
-  const renderer = window.IslandRenderer.createRenderer(document.getElementById('map-canvas'), generator);
+  let renderer = null;
 
-  function init() {
+  function init({ globeFactory } = {}) {
+    renderer = window.IslandRenderer.createRenderer(
+      document.getElementById('map-canvas'),
+      generator,
+      document.getElementById('globe-stage'),
+      globeFactory
+    );
     Object.entries(generator.BIOME_PRESETS).forEach(([id, preset]) => {
       const option = document.createElement('option');
       option.value = id;
@@ -71,8 +80,10 @@
     document.getElementById('save').addEventListener('click', saveCurrent);
     document.getElementById('load').addEventListener('click', loadSelected);
     document.getElementById('delete').addEventListener('click', deleteSelected);
-    window.addEventListener('resize', () => render());
-    document.getElementById('map-canvas').addEventListener('pointerdown', selectStart);
+    window.addEventListener('resize', () => {
+      if (renderer) renderer.resize();
+      render();
+    });
   }
 
   function regenerate() {
@@ -101,7 +112,7 @@
   function updateSummary() {
     const land = Math.round(state.result.summary.land * 100);
     const water = Math.round(state.result.summary.water * 100);
-    el.summary.textContent = `Seed ${state.settings.seed} | ${land}% land, ${water}% water | Start ${state.settings.start.x}, ${state.settings.start.y}`;
+    el.summary.textContent = `Seed ${state.settings.seed} | ${land}% land, ${water}% water`;
   }
 
   function updateLegend() {
@@ -111,19 +122,6 @@
       item.innerHTML = `<i style="background:${biome.color}"></i>${biome.label} ${state.result.summary.counts[index]}`;
       return item;
     }));
-  }
-
-  function selectStart(event) {
-    if (state.view !== 'grid') return;
-    const tile = renderer.tileFromPointer(event.clientX, event.clientY);
-    if (!tile) return;
-    const value = state.result.values[tile.y][tile.x];
-    if (generator.classify(value, state.settings) === 0) {
-      showToast('Start point must be on land');
-      return;
-    }
-    state.settings.start = tile;
-    regenerate();
   }
 
   async function copyExport() {
@@ -182,5 +180,5 @@
     return Number.isInteger(value) ? value : Number(value).toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
   }
 
-  init();
-})();
+  return { init };
+});

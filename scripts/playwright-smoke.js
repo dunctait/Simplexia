@@ -1,9 +1,12 @@
 const path = require('path');
+const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { chromium } = require('playwright');
 
 async function main() {
   const repoRoot = path.resolve(__dirname, '..');
+  const artifactDir = path.join(repoRoot, 'artifacts', 'smoke');
+  fs.mkdirSync(artifactDir, { recursive: true });
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto(pathToFileURL(path.join(repoRoot, 'index.html')).href, { waitUntil: 'domcontentloaded' });
@@ -14,6 +17,10 @@ async function main() {
   await page.waitForFunction((seed) => document.querySelector('#seedOut').textContent !== seed, initialSeed);
 
   await page.locator('[data-view="globe"]').click();
+  await page.waitForFunction(() => {
+    const stage = document.querySelector('#globe-stage');
+    return stage && !stage.hidden && stage.querySelector('canvas');
+  });
   await page.locator('#showGrid').check();
   await page.locator('#saveName').fill('Smoke island');
   await page.locator('#save').click();
@@ -23,11 +30,24 @@ async function main() {
     const canvas = document.querySelector('#map-canvas');
     const ctx = canvas.getContext('2d');
     const sample = ctx.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data;
-    return { width: canvas.width, height: canvas.height, sample: Array.from(sample) };
+    const globeCanvas = document.querySelector('#globe-stage canvas');
+    const globeRect = globeCanvas.getBoundingClientRect();
+    const gl = globeCanvas.getContext('webgl2') || globeCanvas.getContext('webgl');
+    const globePixel = new Uint8Array(4);
+    gl.readPixels(Math.floor(globeCanvas.width / 2), Math.floor(globeCanvas.height / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, globePixel);
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      sample: Array.from(sample),
+      globe: { width: globeRect.width, height: globeRect.height, sample: Array.from(globePixel) }
+    };
   });
 
   if (canvasInfo.width < 240 || canvasInfo.height < 240) throw new Error(`Canvas too small: ${JSON.stringify(canvasInfo)}`);
   if (canvasInfo.sample[3] === 0) throw new Error('Canvas center is transparent');
+  if (canvasInfo.globe.width < 240 || canvasInfo.globe.height < 240) throw new Error(`Globe canvas too small: ${JSON.stringify(canvasInfo)}`);
+  if (canvasInfo.globe.sample.every((value) => value === 0)) throw new Error(`Globe center pixel is blank: ${JSON.stringify(canvasInfo)}`);
+  await page.screenshot({ path: path.join(artifactDir, 'globe-mobile.png'), fullPage: true });
 
   await browser.close();
   console.log(JSON.stringify({ ok: true, canvasInfo }, null, 2));

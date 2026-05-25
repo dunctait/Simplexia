@@ -1,9 +1,12 @@
 const path = require('path');
+const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { chromium } = require('playwright');
 
 async function checkViewport(browser, repoRoot, viewport) {
   const page = await browser.newPage({ viewport });
+  const artifactDir = path.join(repoRoot, 'artifacts', 'layout');
+  fs.mkdirSync(artifactDir, { recursive: true });
   await page.goto(pathToFileURL(path.join(repoRoot, 'index.html')).href, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.simplexIslands && window.simplexIslands.state.result);
   await page.waitForTimeout(100);
@@ -20,12 +23,22 @@ async function checkViewport(browser, repoRoot, viewport) {
     });
     return { canvas, controls, buttons, viewport: { width: innerWidth, height: innerHeight }, scrollWidth: document.documentElement.scrollWidth };
   });
+  if (viewport.width <= 860) {
+    await page.evaluate(() => window.scrollTo(0, 720));
+    await page.waitForTimeout(80);
+    result.afterScroll = await page.evaluate(() => {
+      const r = document.querySelector('.map-panel').getBoundingClientRect();
+      return { y: r.y, bottom: r.bottom };
+    });
+  }
+  await page.screenshot({ path: path.join(artifactDir, `layout-${viewport.width}x${viewport.height}.png`), fullPage: true });
   await page.close();
 
   const failures = [];
   if (result.scrollWidth > viewport.width + 1) failures.push(`horizontal overflow ${result.scrollWidth} > ${viewport.width}`);
   if (result.canvas.width < 240 || result.canvas.height < 240) failures.push('canvas below minimum useful size');
   if (viewport.width > 860 && result.canvas.bottom > viewport.height + 1) failures.push('desktop canvas extends below viewport');
+  if (viewport.width <= 860 && result.afterScroll && result.afterScroll.y > 12) failures.push('map panel is not pinned after mobile scroll');
   for (const button of result.buttons) {
     if (button.height < 40) failures.push(`small button ${button.text}`);
   }

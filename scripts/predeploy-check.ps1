@@ -13,7 +13,11 @@ $requiredFiles = @(
     "src/storage.js",
     "src/renderer.js",
     "src/ui.js",
-    "src/style.css"
+    "src/globe-scene.js",
+    "src/bootstrap.js",
+    "src/style.css",
+    "vendor/globe-bundle.js",
+    "vendor/THREE-LICENSE"
 )
 
 foreach ($file in $requiredFiles) {
@@ -48,7 +52,9 @@ $expectedScripts = @(
     "src/generator.js",
     "src/storage.js",
     "src/renderer.js",
-    "src/ui.js"
+    "vendor/globe-bundle.js",
+    "src/ui.js",
+    "src/bootstrap.js"
 )
 $lastIndex = -1
 foreach ($script in $expectedScripts) {
