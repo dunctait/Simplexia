@@ -94,6 +94,65 @@
     };
   }
 
+  function generateGlobe(input) {
+    const settings = normalizeSettings(input);
+    const sample = createSphericalSampler(settings);
+    const counts = [0, 0, 0, 0];
+    const sampleRows = 96;
+    const sampleColumns = 192;
+    for (let y = 0; y < sampleRows; y += 1) {
+      const latitude = -Math.PI / 2 + (y / (sampleRows - 1)) * Math.PI;
+      const radius = Math.cos(latitude);
+      for (let x = 0; x < sampleColumns; x += 1) {
+        const longitude = (x / sampleColumns) * Math.PI * 2;
+        const nx = Math.cos(longitude) * radius;
+        const ny = Math.sin(latitude);
+        const nz = Math.sin(longitude) * radius;
+        counts[classify(sample(nx, ny, nz), settings)] += 1;
+      }
+    }
+    const total = counts.reduce((sum, count) => sum + count, 0);
+    return {
+      settings,
+      globe: true,
+      summary: {
+        water: counts[0] / total,
+        land: (total - counts[0]) / total,
+        counts
+      },
+      exportString: toExportString(settings)
+    };
+  }
+
+  function sphericalValue(nx, ny, nz, input) {
+    const settings = normalizeSettings(input);
+    return createSphericalSampler(settings)(nx, ny, nz);
+  }
+
+  function createSphericalSampler(input) {
+    const settings = normalizeSettings(input);
+    const simplex = SimplexNoise.create(settings.seed);
+    return (nx, ny, nz) => {
+      let frequency = Math.max(0.6, settings.scale * 180);
+      let weight = 1;
+      let total = 0;
+      let weightSum = 0;
+      for (let octave = 0; octave < settings.octaves; octave += 1) {
+        const a = simplex.noise(nx * frequency + 31.7, ny * frequency - 11.3);
+        const b = simplex.noise(ny * frequency + 19.1, nz * frequency + 47.2);
+        const c = simplex.noise(nz * frequency - 23.5, nx * frequency + 7.7);
+        const blended = (a + b + c) / 3;
+        total += blended * weight;
+        weightSum += weight;
+        frequency *= 2;
+        weight *= settings.roughness;
+      }
+      const continental = 0.5 + total / (2 * (weightSum || 1));
+      const polarLift = Math.abs(ny) * 0.08;
+      return clampNumber(continental + polarLift, 0, 1);
+    };
+  }
+
   function classify(value, settings) {
     if (value < settings.seaLevel) return 0;
     if (value < settings.beachLevel) return 1;
@@ -163,5 +222,5 @@
     return Math.min(max, Math.max(min, numeric));
   }
 
-  return { DEFAULT_SETTINGS, BIOME_PRESETS, normalizeSettings, generate, classify, toExportString };
+  return { DEFAULT_SETTINGS, BIOME_PRESETS, normalizeSettings, generate, generateGlobe, sphericalValue, createSphericalSampler, classify, toExportString };
 });

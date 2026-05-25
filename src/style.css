@@ -74,6 +74,37 @@ button:hover, .segmented.is-active {
   z-index: 2;
 }
 
+.loading-overlay {
+  position: absolute;
+  inset: 74px 14px 48px;
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  border-radius: 8px;
+  background: rgba(11, 17, 25, 0.62);
+  color: var(--text);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.loading-overlay[hidden] {
+  display: none;
+}
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  justify-self: center;
+  border: 3px solid rgba(255, 255, 255, 0.24);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;

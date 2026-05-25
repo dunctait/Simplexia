@@ -8,18 +8,20 @@
   const state = {
     settings: generator.normalizeSettings(restoredSession ? restoredSession.settings : undefined),
     result: null,
-    view: restoredSession ? restoredSession.view : 'grid',
+    view: restoredSession ? restoredSession.view : 'globe',
     showGrid: restoredSession ? restoredSession.showGrid : false
   };
 
   const ids = [
     'columns', 'rows', 'octaves', 'roughness', 'scale', 'seaLevel', 'beachLevel', 'mountainLevel',
     'edgeFade', 'seed', 'radialEnabled', 'showGrid', 'biomePreset', 'summary', 'legend', 'toast',
-    'saveName', 'savedList'
+    'saveName', 'savedList', 'generation-loading'
   ];
   const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
   const outputs = Object.fromEntries(['columns', 'rows', 'octaves', 'roughness', 'scale', 'seaLevel', 'beachLevel', 'mountainLevel', 'edgeFade', 'seed'].map((id) => [id, document.getElementById(`${id}Out`)]));
   let renderer = null;
+  let activeWorker = null;
+  let generationId = 0;
 
   function init({ globeFactory } = {}) {
     renderer = window.IslandRenderer.createRenderer(
@@ -38,9 +40,9 @@
     syncControls();
     syncViewToggle();
     syncModeControls();
-    regenerate();
     refreshSaves();
     window.simplexIslands = { state, regenerate };
+    regenerate();
   }
 
   function bindControls() {
@@ -97,14 +99,52 @@
 
   function regenerate() {
     state.settings = generator.normalizeSettings(state.settings);
-    state.result = generator.generate(effectiveGenerationSettings());
     syncControls();
     syncModeControls();
-    render();
     persistSession();
+    startGeneration(effectiveGenerationSettings());
+  }
+
+  function startGeneration(settings) {
+    generationId += 1;
+    const id = generationId;
+    if (activeWorker) activeWorker.terminate();
+    setLoading(true);
+    if (!window.Worker) {
+      setTimeout(() => finishGeneration(id, state.view === 'globe' ? generator.generateGlobe(settings) : generator.generate(settings)), 0);
+      return;
+    }
+    try {
+      activeWorker = new Worker('src/generation-worker.js');
+    } catch {
+      setTimeout(() => finishGeneration(id, state.view === 'globe' ? generator.generateGlobe(settings) : generator.generate(settings)), 0);
+      return;
+    }
+    activeWorker.onmessage = (event) => {
+      finishGeneration(event.data.id, event.data.result);
+    };
+    activeWorker.onerror = (event) => {
+      if (id !== generationId) return;
+      activeWorker = null;
+      setLoading(false);
+      showToast(event.message || 'Generation failed');
+    };
+    activeWorker.postMessage({ id, settings, view: state.view });
+  }
+
+  function finishGeneration(id, result) {
+    if (id !== generationId) return;
+    if (activeWorker) {
+      activeWorker.terminate();
+      activeWorker = null;
+    }
+    state.result = result;
+    render();
+    setLoading(false);
   }
 
   function render() {
+    if (!state.result) return;
     renderer.render(state.result, { view: state.view, showGrid: state.showGrid });
     updateSummary();
     updateLegend();
@@ -148,6 +188,10 @@
       view: state.view,
       showGrid: state.showGrid
     });
+  }
+
+  function setLoading(isLoading) {
+    el['generation-loading'].hidden = !isLoading;
   }
 
   function updateSummary() {

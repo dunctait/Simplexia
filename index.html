@@ -15,12 +15,16 @@
           <p id="summary">Generating island...</p>
         </div>
         <div class="view-toggle" aria-label="View mode">
-          <button class="segmented is-active" data-view="grid" type="button">Grid</button>
-          <button class="segmented" data-view="globe" type="button">Globe</button>
+          <button class="segmented is-active" data-view="globe" type="button">Globe</button>
+          <button class="segmented" data-view="grid" type="button">Grid</button>
         </div>
       </div>
       <canvas id="map-canvas" width="768" height="768" aria-label="Island preview"></canvas>
       <div id="globe-stage" hidden aria-label="3D island globe"></div>
+      <div id="generation-loading" class="loading-overlay" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <span>Generating</span>
+      </div>
       <div class="legend" id="legend" aria-label="Biome legend"></div>
     </section>
 

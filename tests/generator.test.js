@@ -29,6 +29,14 @@ test('dimensions normalize up to 2048', () => {
   assert.equal(settings.rows, 2048);
 });
 
+test('globe generation produces deterministic summary without grid values', () => {
+  const first = generator.generateGlobe({ seed: 12, octaves: 5 });
+  const second = generator.generateGlobe({ seed: 12, octaves: 5 });
+  assert.equal(first.globe, true);
+  assert.equal(first.values, undefined);
+  assert.deepEqual(first.summary.counts, second.summary.counts);
+});
+
 test('export string contains serializable settings', () => {
   const result = generator.generate({ seed: 99 });
   const parsed = JSON.parse(result.exportString);

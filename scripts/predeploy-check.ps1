@@ -12,6 +12,7 @@ $requiredFiles = @(
     "src/generator.js",
     "src/storage.js",
     "src/renderer.js",
+    "src/generation-worker.js",
     "src/ui.js",
     "src/globe-scene.js",
     "src/bootstrap.js",

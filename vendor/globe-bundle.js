@@ -12131,26 +12131,6 @@ var IslandGlobeBundle = (() => {
       this.image = value;
     }
   };
-  var CanvasTexture = class extends Texture {
-    /**
-     * Constructs a new texture.
-     *
-     * @param {HTMLCanvasElement} [canvas] - The HTML canvas element.
-     * @param {number} [mapping=Texture.DEFAULT_MAPPING] - The texture mapping.
-     * @param {number} [wrapS=ClampToEdgeWrapping] - The wrapS value.
-     * @param {number} [wrapT=ClampToEdgeWrapping] - The wrapT value.
-     * @param {number} [magFilter=LinearFilter] - The mag filter value.
-     * @param {number} [minFilter=LinearMipmapLinearFilter] - The min filter value.
-     * @param {number} [format=RGBAFormat] - The texture format.
-     * @param {number} [type=UnsignedByteType] - The texture type.
-     * @param {number} [anisotropy=Texture.DEFAULT_ANISOTROPY] - The anisotropy value.
-     */
-    constructor(canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy) {
-      super(canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy);
-      this.isCanvasTexture = true;
-      this.needsUpdate = true;
-    }
-  };
   var DepthTexture = class extends Texture {
     /**
      * Constructs a new depth texture.
@@ -26723,7 +26703,6 @@ void main() {
     scene.add(key);
     scene.add(new AmbientLight(10465981, 1.15));
     let mesh = null;
-    let texture = null;
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
@@ -26769,11 +26748,9 @@ void main() {
         mesh.material.dispose();
         scene.remove(mesh);
       }
-      if (texture) texture.dispose();
-      texture = createTerrainTexture(result, generator);
-      const geometry = createTerrainSphere(result);
+      const geometry = createTerrainSphere(result, generator);
       const material = new MeshStandardMaterial({
-        map: texture,
+        vertexColors: true,
         roughness: 0.92,
         metalness: 0,
         flatShading: false
@@ -26813,43 +26790,25 @@ void main() {
     animate();
     return { render, resize };
   }
-  function createTerrainTexture(result, generator) {
-    const { settings, values } = result;
-    const preset = generator.BIOME_PRESETS[settings.biomePreset];
-    const canvas = document.createElement("canvas");
-    canvas.width = settings.columns;
-    canvas.height = settings.rows;
-    const ctx = canvas.getContext("2d");
-    for (let y = 0; y < settings.rows; y += 1) {
-      for (let x = 0; x < settings.columns; x += 1) {
-        ctx.fillStyle = preset.biomes[generator.classify(values[y][x], settings)].color;
-        ctx.fillRect(x, y, 1, 1);
-      }
-    }
-    const texture = new CanvasTexture(canvas);
-    texture.colorSpace = SRGBColorSpace;
-    texture.wrapS = RepeatWrapping;
-    texture.wrapT = ClampToEdgeWrapping;
-    texture.magFilter = NearestFilter;
-    texture.minFilter = LinearMipmapLinearFilter;
-    return texture;
-  }
-  function createTerrainSphere(result) {
+  function createTerrainSphere(result, generator) {
     const geometry = new SphereGeometry(1.55, 128, 80);
     const position = geometry.attributes.position;
-    const uv = geometry.attributes.uv;
+    const colors = [];
     const normal = new Vector3();
+    const color = new Color();
+    const preset = generator.BIOME_PRESETS[result.settings.biomePreset];
+    const sample = generator.createSphericalSampler(result.settings);
     for (let index = 0; index < position.count; index += 1) {
-      const u = uv.getX(index);
-      const v = uv.getY(index);
-      const x = Math.min(result.settings.columns - 1, Math.max(0, Math.floor(u * result.settings.columns)));
-      const y = Math.min(result.settings.rows - 1, Math.max(0, Math.floor((1 - v) * result.settings.rows)));
-      const height = result.values[y][x];
-      const biome = height < result.settings.seaLevel ? 0 : height < result.settings.beachLevel ? 1 : height < result.settings.mountainLevel ? 2 : 3;
-      const elevation = biome === 0 ? -0.018 : 0.02 + height * 0.12 + biome * 0.018;
       normal.set(position.getX(index), position.getY(index), position.getZ(index)).normalize();
+      const height = sample(normal.x, normal.y, normal.z);
+      const biome = generator.classify(height, result.settings);
+      const elevation = biome === 0 ? -0.02 : 0.015 + height * 0.16 + biome * 0.014;
       position.setXYZ(index, normal.x * (1.55 + elevation), normal.y * (1.55 + elevation), normal.z * (1.55 + elevation));
+      color.set(preset.biomes[biome].color);
+      const shade = 0.72 + height * 0.32;
+      colors.push(color.r * shade, color.g * shade, color.b * shade);
     }
+    geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
     return geometry;
   }
