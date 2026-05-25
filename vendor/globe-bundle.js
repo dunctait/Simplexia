@@ -28564,13 +28564,14 @@ void main() {
   }
   function createSeaFish(seaNormals, playful, seed) {
     preloadFishPrototype();
+    if (!seaNormals || seaNormals.length === 0) return { fish: [], fishJumpData: [] };
     const random = seededRandom(seed + 302);
     const color = playful ? 16751421 : 8181759;
     const fish = [];
     const fishJumpData = [];
     const total = Math.min(18, Math.max(6, Math.floor(seaNormals.length / 10)));
     for (let i = 0; i < total; i += 1) {
-      const normal = seaNormals[Math.floor(random() * seaNormals.length)] || new Vector3(0, 1, 0);
+      const normal = seaNormals[Math.floor(random() * seaNormals.length)];
       const tangent = new Vector3().crossVectors(normal, new Vector3(0, 1, 0));
       if (tangent.lengthSq() < 1e-3) tangent.set(1, 0, 0);
       tangent.normalize();

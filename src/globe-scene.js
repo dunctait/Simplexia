@@ -368,13 +368,14 @@ function createCloudTexture(seed, coverage) {
 
 function createSeaFish(seaNormals, playful, seed) {
   preloadFishPrototype();
+  if (!seaNormals || seaNormals.length === 0) return { fish: [], fishJumpData: [] };
   const random = seededRandom(seed + 302);
   const color = playful ? 0xff9b3d : 0x7cd7ff;
   const fish = [];
   const fishJumpData = [];
   const total = Math.min(18, Math.max(6, Math.floor(seaNormals.length / 10)));
   for (let i = 0; i < total; i += 1) {
-    const normal = seaNormals[Math.floor(random() * seaNormals.length)] || new THREE.Vector3(0, 1, 0);
+    const normal = seaNormals[Math.floor(random() * seaNormals.length)];
     const tangent = new THREE.Vector3().crossVectors(normal, new THREE.Vector3(0, 1, 0));
     if (tangent.lengthSq() < 0.001) tangent.set(1, 0, 0);
     tangent.normalize();
