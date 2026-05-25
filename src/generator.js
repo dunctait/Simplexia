@@ -97,6 +97,7 @@
   function generateGlobe(input) {
     const settings = normalizeSettings(input);
     const sample = createSphericalSampler(settings);
+    const values = [];
     const counts = [0, 0, 0, 0];
     const sampleRows = 96;
     const sampleColumns = 192;
@@ -108,9 +109,14 @@
         const nx = Math.cos(longitude) * radius;
         const ny = Math.sin(latitude);
         const nz = Math.sin(longitude) * radius;
-        counts[classify(sample(nx, ny, nz), settings)] += 1;
+        values.push(sample(nx, ny, nz));
       }
     }
+    const low = percentile(values, 0.02);
+    const high = percentile(values, 0.98);
+    values.forEach((value) => {
+      counts[classify(normalizeValue(value, low, high), settings)] += 1;
+    });
     const total = counts.reduce((sum, count) => sum + count, 0);
     return {
       settings,
@@ -132,25 +138,51 @@
   function createSphericalSampler(input) {
     const settings = normalizeSettings(input);
     const simplex = SimplexNoise.create(settings.seed);
+    const continentFrequency = 1.15 + settings.scale * 10;
+    const detailBaseFrequency = Math.max(2.2, settings.scale * 155);
     return (nx, ny, nz) => {
-      let frequency = Math.max(0.6, settings.scale * 180);
+      const continentRaw = triPlanarNoise(simplex, nx, ny, nz, continentFrequency, 0);
+      const continent = smoothstep(-0.34, 0.52, continentRaw);
+      let frequency = detailBaseFrequency;
       let weight = 1;
       let total = 0;
       let weightSum = 0;
       for (let octave = 0; octave < settings.octaves; octave += 1) {
-        const a = simplex.noise(nx * frequency + 31.7, ny * frequency - 11.3);
-        const b = simplex.noise(ny * frequency + 19.1, nz * frequency + 47.2);
-        const c = simplex.noise(nz * frequency - 23.5, nx * frequency + 7.7);
-        const blended = (a + b + c) / 3;
-        total += blended * weight;
+        total += triPlanarNoise(simplex, nx, ny, nz, frequency, octave + 1) * weight;
         weightSum += weight;
         frequency *= 2;
         weight *= settings.roughness;
       }
-      const continental = 0.5 + total / (2 * (weightSum || 1));
-      const polarLift = Math.abs(ny) * 0.08;
-      return clampNumber(continental + polarLift, 0, 1);
+      const detail = 0.5 + total / (2 * (weightSum || 1));
+      const islandChain = smoothstep(0.18, 0.88, triPlanarNoise(simplex, nx, ny, nz, continentFrequency * 2.3, 11));
+      const polarIce = Math.max(0, Math.abs(ny) - 0.72) * 0.18;
+      const value = continent * 0.58 + detail * 0.16 + islandChain * 0.05 + polarIce - 0.24;
+      return clampNumber(value, 0, 1);
     };
+  }
+
+  function triPlanarNoise(simplex, nx, ny, nz, frequency, offset) {
+    const ox = 17.13 * offset;
+    const oy = -29.71 * offset;
+    const oz = 43.19 * offset;
+    const a = simplex.noise(nx * frequency + 31.7 + ox, ny * frequency - 11.3 + oy);
+    const b = simplex.noise(ny * frequency + 19.1 + oy, nz * frequency + 47.2 + oz);
+    const c = simplex.noise(nz * frequency - 23.5 + oz, nx * frequency + 7.7 + ox);
+    return (a + b + c) / 3;
+  }
+
+  function smoothstep(edge0, edge1, value) {
+    const x = clampNumber((value - edge0) / (edge1 - edge0), 0, 1);
+    return x * x * (3 - 2 * x);
+  }
+
+  function percentile(values, ratio) {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * ratio)))];
+  }
+
+  function normalizeValue(value, low, high) {
+    return clampNumber((value - low) / ((high - low) || 1), 0, 1);
   }
 
   function classify(value, settings) {

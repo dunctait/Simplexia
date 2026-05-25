@@ -26798,9 +26798,16 @@ void main() {
     const color = new Color();
     const preset = generator.BIOME_PRESETS[result.settings.biomePreset];
     const sample = generator.createSphericalSampler(result.settings);
+    const rawValues = [];
     for (let index = 0; index < position.count; index += 1) {
       normal.set(position.getX(index), position.getY(index), position.getZ(index)).normalize();
-      const height = sample(normal.x, normal.y, normal.z);
+      rawValues.push(sample(normal.x, normal.y, normal.z));
+    }
+    const low = percentile(rawValues, 0.02);
+    const high = percentile(rawValues, 0.98);
+    for (let index = 0; index < position.count; index += 1) {
+      normal.set(position.getX(index), position.getY(index), position.getZ(index)).normalize();
+      const height = normalizeValue(rawValues[index], low, high);
       const biome = generator.classify(height, result.settings);
       const elevation = biome === 0 ? -0.02 : 0.015 + height * 0.16 + biome * 0.014;
       position.setXYZ(index, normal.x * (1.55 + elevation), normal.y * (1.55 + elevation), normal.z * (1.55 + elevation));
@@ -26811,6 +26818,13 @@ void main() {
     geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
     return geometry;
+  }
+  function percentile(values, ratio) {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * ratio)))];
+  }
+  function normalizeValue(value, low, high) {
+    return Math.min(1, Math.max(0, (value - low) / (high - low || 1)));
   }
   return __toCommonJS(globe_scene_exports);
 })();
