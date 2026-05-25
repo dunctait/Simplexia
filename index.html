@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simplex Islands</title>
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="map-panel" aria-label="Generated island map">
+      <div class="topbar">
+        <div>
+          <h1>Simplex Islands</h1>
+          <p id="summary">Generating island...</p>
+        </div>
+        <div class="view-toggle" aria-label="View mode">
+          <button class="segmented is-active" data-view="grid" type="button">Grid</button>
+          <button class="segmented" data-view="globe" type="button">Globe</button>
+        </div>
+      </div>
+      <canvas id="map-canvas" width="768" height="768" aria-label="Island preview"></canvas>
+      <div class="legend" id="legend" aria-label="Biome legend"></div>
+    </section>
+
+    <aside class="control-panel" id="controls">
+      <div class="actions">
+        <button id="randomize" type="button">Randomize</button>
+        <button id="reset" type="button">Reset</button>
+        <button id="copy-export" type="button">Copy Export</button>
+      </div>
+
+      <label class="field">
+        <span>Biome Set</span>
+        <select id="biomePreset"></select>
+      </label>
+
+      <div class="control-grid">
+        <label class="field"><span>Columns <output id="columnsOut"></output></span><input id="columns" type="range" min="48" max="256" step="8"></label>
+        <label class="field"><span>Rows <output id="rowsOut"></output></span><input id="rows" type="range" min="48" max="256" step="8"></label>
+        <label class="field"><span>Octaves <output id="octavesOut"></output></span><input id="octaves" type="range" min="1" max="8" step="1"></label>
+        <label class="field"><span>Roughness <output id="roughnessOut"></output></span><input id="roughness" type="range" min="0.1" max="1" step="0.01"></label>
+        <label class="field"><span>Scale <output id="scaleOut"></output></span><input id="scale" type="range" min="0.003" max="0.05" step="0.001"></label>
+        <label class="field"><span>Sea Level <output id="seaLevelOut"></output></span><input id="seaLevel" type="range" min="0.05" max="0.55" step="0.01"></label>
+        <label class="field"><span>Beach Line <output id="beachLevelOut"></output></span><input id="beachLevel" type="range" min="0.08" max="0.7" step="0.01"></label>
+        <label class="field"><span>Mountain Line <output id="mountainLevelOut"></output></span><input id="mountainLevel" type="range" min="0.3" max="0.95" step="0.01"></label>
+        <label class="field"><span>Edge Fade <output id="edgeFadeOut"></output></span><input id="edgeFade" type="range" min="0" max="0.35" step="0.01"></label>
+        <label class="field"><span>Seed <output id="seedOut"></output></span><input id="seed" type="range" min="0" max="255" step="1"></label>
+      </div>
+
+      <label class="switch"><input id="radialEnabled" type="checkbox"> <span>Radial island mask</span></label>
+      <label class="switch"><input id="showGrid" type="checkbox"> <span>Show tile grid</span></label>
+
+      <section class="saves" aria-label="Saved generations">
+        <div class="save-row">
+          <input id="saveName" type="text" maxlength="40" placeholder="Generation name">
+          <button id="save" type="button">Save</button>
+        </div>
+        <select id="savedList" size="5" aria-label="Saved generations"></select>
+        <div class="actions">
+          <button id="load" type="button">Load</button>
+          <button id="delete" type="button">Delete</button>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="src/simplex-noise.js"></script>
+  <script src="src/generator.js"></script>
+  <script src="src/storage.js"></script>
+  <script src="src/renderer.js"></script>
+  <script src="src/ui.js"></script>
+</body>
+</html>
