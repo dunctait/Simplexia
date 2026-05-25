@@ -2,8 +2,15 @@ import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 
 const FISH_OBJ_URL = 'assets/fish/quaternius/Fish1.obj';
+const BUILDING_OBJ_URLS = [
+  'assets/buildings/quaternius/House2.obj',
+  'assets/buildings/quaternius/Shop.obj',
+  'assets/buildings/quaternius/Flat2.obj'
+];
 let fishPrototypePromise = null;
 let fishPrototypeGeometry = null;
+let buildingPrototypePromise = null;
+let buildingPrototypeGeometries = [];
 
 export function createGlobeScene(container, generator) {
   const scene = new THREE.Scene();
@@ -25,6 +32,7 @@ export function createGlobeScene(container, generator) {
   const planetGroup = new THREE.Group();
   scene.add(planetGroup);
   preloadFishPrototype();
+  preloadBuildingPrototypes();
 
   let mesh = null;
   let ocean = null;
@@ -282,6 +290,47 @@ function preloadFishPrototype() {
   return fishPrototypePromise;
 }
 
+function preloadBuildingPrototypes() {
+  if (buildingPrototypeGeometries.length || buildingPrototypePromise) return buildingPrototypePromise;
+  buildingPrototypePromise = Promise.all(BUILDING_OBJ_URLS.map((url) => loadObjGeometry(url))).then((geometries) => {
+    buildingPrototypeGeometries = geometries.filter(Boolean);
+    return buildingPrototypeGeometries;
+  }).catch(() => {
+    buildingPrototypeGeometries = [];
+    return [];
+  });
+  return buildingPrototypePromise;
+}
+
+function loadObjGeometry(url) {
+  return new Promise((resolve) => {
+    const loader = new OBJLoader();
+    loader.load(url, (obj) => {
+      let geometry = null;
+      obj.traverse((node) => {
+        if (!geometry && node.isMesh && node.geometry) geometry = node.geometry.clone();
+      });
+      if (!geometry) {
+        resolve(null);
+        return;
+      }
+      geometry.computeBoundingBox();
+      if (geometry.boundingBox) {
+        const center = new THREE.Vector3();
+        const size = new THREE.Vector3();
+        geometry.boundingBox.getCenter(center);
+        geometry.boundingBox.getSize(size);
+        const maxEdge = Math.max(size.x || 1, size.y || 1, size.z || 1);
+        geometry.translate(-center.x, -geometry.boundingBox.min.y, -center.z);
+        const scale = 0.11 / maxEdge;
+        geometry.scale(scale, scale, scale);
+      }
+      geometry.computeVertexNormals();
+      resolve(geometry);
+    }, undefined, () => resolve(null));
+  });
+}
+
 function createTerrainSphere(result, generator) {
   const segments = resolutionSegments(result);
   const geometry = new THREE.SphereGeometry(1.55, segments, Math.max(48, Math.round(segments * 0.62)));
@@ -396,19 +445,22 @@ function createSeaFish(seaNormals, playful, seed) {
 }
 
 function createTowns(beach, forest, playful, seed) {
+  preloadBuildingPrototypes();
   const random = seededRandom(seed + 901);
   const pool = [...beach.slice(0, 70), ...forest.slice(0, 70)];
   const towns = [];
   const baseColor = playful ? 0xf4e4c5 : 0xe1d5bf;
   for (let i = 0; i < Math.min(16, pool.length); i += 1) {
     const n = pool[Math.floor(random() * pool.length)];
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.04, 0.04, 0.04),
-      new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.9, metalness: 0 })
-    );
+    const geometry = buildingPrototypeGeometries.length
+      ? buildingPrototypeGeometries[Math.floor(random() * buildingPrototypeGeometries.length)].clone()
+      : new THREE.BoxGeometry(0.04, 0.04, 0.04);
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.9, metalness: 0 }));
     const h = 1.565 + random() * 0.01;
     mesh.position.set(n.x * h, n.y * h, n.z * h);
     mesh.lookAt(mesh.position.clone().multiplyScalar(2));
+    mesh.rotateX(-Math.PI / 2);
+    mesh.rotateY(random() * Math.PI * 2);
     towns.push(mesh);
   }
   return towns;

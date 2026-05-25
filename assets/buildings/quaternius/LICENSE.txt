@@ -1,0 +1,4 @@
+Assets: House2.obj, Shop.obj, Flat2.obj
+Author: Quaternius
+Source: https://opengameart.org/content/lowpoly-buildings
+License: CC0 1.0 (Public Domain)
