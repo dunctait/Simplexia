@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Simplex Islands is an HTML5 port of the original JavaFX simplex-noise island generator. It is hosted directly from GitHub Pages and is designed for autonomous development with fast local checks, unit tests, and Playwright smoke tests.
+Simplex Islands is an HTML5 procedural planet generator. It is hosted directly from GitHub Pages and is designed for autonomous development with fast local checks, unit tests, and Playwright smoke tests.
 
 ## Tech Stack
 
@@ -22,9 +22,9 @@ npm run predeploy
 ## Architecture
 
 - `src/simplex-noise.js` ports the deterministic 2D simplex noise implementation.
-- `src/generator.js` owns terrain settings, map generation, masks, biome classification, summaries, and exports.
+- `src/generator.js` owns globe terrain settings, spherical noise generation, biome classification, summaries, and exports.
 - `src/storage.js` owns localStorage persistence and normalization.
-- `src/renderer.js` owns 2D canvas rendering and delegates 3D globe rendering.
+- `src/renderer.js` delegates rendering to the 3D globe scene.
 - `src/globe-scene.js` owns the Three.js/WebGL globe scene.
 - `vendor/globe-bundle.js` is the browser-ready Three.js bundle generated from `src/globe-scene.js` with `npm run build:globe`.
 - `src/ui.js` owns DOM binding, state updates, save/load controls, and app orchestration.
@@ -39,9 +39,8 @@ Boundary rules:
 
 - Mobile-first, usable in portrait and landscape
 - Touch targets must remain at least 40px high
-- Controls must not overlap the canvas or each other
-- Grid and globe modes must render from the same generated map data
-- Globe mode must remain a real Three.js/WebGL scene, not a 2D projection.
+- Controls must not overlap the globe or each other
+- The globe must remain a real Three.js/WebGL scene, not a 2D projection or rectangular texture stretched over a sphere.
 
 ## Harness Notes
 

@@ -16,14 +16,16 @@ async function main() {
   await page.locator('#randomize').click();
   await page.waitForFunction((seed) => document.querySelector('#seedOut').textContent !== seed, initialSeed);
 
-  await page.locator('[data-view="globe"]').click();
   await page.waitForFunction(() => {
     const stage = document.querySelector('#globe-stage');
     return stage && !stage.hidden && stage.querySelector('canvas');
   });
-  await page.locator('#showGrid').check();
   await page.locator('#octaves').evaluate((input) => {
     input.value = '6';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#resolution').evaluate((input) => {
+    input.value = '224';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.locator('#biomePreset').selectOption('arctic');
@@ -34,12 +36,11 @@ async function main() {
     return stage && !stage.hidden && stage.querySelector('canvas');
   });
   const restoredSession = await page.evaluate(() => ({
-    view: window.simplexIslands.state.view,
-    showGrid: window.simplexIslands.state.showGrid,
+    resolution: window.simplexIslands.state.settings.resolution,
     octaves: window.simplexIslands.state.settings.octaves,
     biomePreset: window.simplexIslands.state.settings.biomePreset
   }));
-  if (restoredSession.view !== 'globe' || !restoredSession.showGrid || restoredSession.octaves !== 6 || restoredSession.biomePreset !== 'arctic') {
+  if (restoredSession.resolution !== 224 || restoredSession.octaves !== 6 || restoredSession.biomePreset !== 'arctic') {
     throw new Error(`Session did not restore after refresh: ${JSON.stringify(restoredSession)}`);
   }
   await page.locator('#saveName').fill('Smoke island');
@@ -55,16 +56,7 @@ async function main() {
     return { width: globeRect.width, height: globeRect.height, sample: Array.from(globePixel) };
   });
 
-  await page.locator('[data-view="grid"]').click();
-  await page.waitForFunction(() => !document.querySelector('#map-canvas').hidden);
-
-  const gridInfo = await page.evaluate(() => {
-    const canvas = document.querySelector('#map-canvas');
-    const ctx = canvas.getContext('2d');
-    const sample = ctx.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data;
-    return { width: canvas.width, height: canvas.height, sample: Array.from(sample) };
-  });
-  const canvasInfo = { ...gridInfo, globe: globeInfo };
+  const canvasInfo = { width: globeInfo.width, height: globeInfo.height, sample: globeInfo.sample, globe: globeInfo };
 
   if (canvasInfo.width < 240 || canvasInfo.height < 240) throw new Error(`Canvas too small: ${JSON.stringify(canvasInfo)}`);
   if (canvasInfo.sample[3] === 0) throw new Error('Canvas center is transparent');

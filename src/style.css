@@ -123,16 +123,11 @@ p {
   color: var(--muted);
 }
 
-.view-toggle, .actions, .save-row {
+.actions, .save-row {
   display: flex;
   gap: 8px;
 }
 
-.segmented {
-  min-width: 74px;
-}
-
-#map-canvas,
 #globe-stage {
   width: 100%;
   max-width: min(100%, 82vh);
@@ -143,11 +138,6 @@ p {
   border-radius: 8px;
   background: #0b1119;
   touch-action: manipulation;
-}
-
-#map-canvas[hidden],
-#globe-stage[hidden] {
-  display: none;
 }
 
 #globe-stage {
@@ -223,20 +213,6 @@ input[type="range"] {
   opacity: 0.58;
 }
 
-.switch {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  color: var(--text);
-}
-
-.switch input {
-  width: 20px;
-  height: 20px;
-  accent-color: var(--accent);
-}
-
 .saves {
   display: grid;
   gap: 10px;
@@ -308,11 +284,10 @@ input[type="range"] {
     flex-direction: column;
   }
 
-  .view-toggle, .actions {
+  .actions {
     width: 100%;
   }
 
-  #map-canvas,
   #globe-stage {
     max-width: clamp(260px, 72vw, 320px);
   }

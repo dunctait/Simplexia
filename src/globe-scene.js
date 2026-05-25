@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 export function createGlobeScene(container, generator) {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b1119);
+  scene.background = new THREE.Color(0x05080d);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
   camera.position.set(0, 0.18, 5.35);
@@ -11,12 +11,14 @@ export function createGlobeScene(container, generator) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.replaceChildren(renderer.domElement);
 
-  const key = new THREE.DirectionalLight(0xffffff, 2.3);
-  key.position.set(3, 2, 4);
+  const key = new THREE.DirectionalLight(0xfff6df, 3.1);
+  key.position.set(4, 1.8, 3.2);
   scene.add(key);
-  scene.add(new THREE.AmbientLight(0x9fb2bd, 1.15));
+  scene.add(new THREE.HemisphereLight(0xd6efff, 0x05070c, 0.72));
 
   let mesh = null;
+  let ocean = null;
+  let atmosphere = null;
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
@@ -65,17 +67,54 @@ export function createGlobeScene(container, generator) {
       mesh.material.dispose();
       scene.remove(mesh);
     }
+    if (ocean) {
+      ocean.geometry.dispose();
+      ocean.material.dispose();
+      scene.remove(ocean);
+    }
+    if (atmosphere) {
+      atmosphere.geometry.dispose();
+      atmosphere.material.dispose();
+      scene.remove(atmosphere);
+    }
 
     const geometry = createTerrainSphere(result, generator);
     const material = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.92,
+      roughness: 0.78,
       metalness: 0,
       flatShading: false
     });
     mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.set(rotation.x, rotation.y, 0);
+    ocean = new THREE.Mesh(
+      new THREE.SphereGeometry(1.552, 128, 80),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x163d75,
+        transparent: true,
+        opacity: 0.54,
+        roughness: 0.18,
+        metalness: 0,
+        transmission: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.1,
+        depthWrite: false
+      })
+    );
+    atmosphere = new THREE.Mesh(
+      new THREE.SphereGeometry(1.64, 128, 80),
+      new THREE.MeshBasicMaterial({
+        color: 0x7fb7ff,
+        transparent: true,
+        opacity: 0.13,
+        blending: THREE.AdditiveBlending,
+        side: THREE.BackSide,
+        depthWrite: false
+      })
+    );
+    [mesh, ocean, atmosphere].forEach((item) => item.rotation.set(rotation.x, rotation.y, 0));
     scene.add(mesh);
+    scene.add(ocean);
+    scene.add(atmosphere);
     draw();
   }
 
@@ -89,8 +128,10 @@ export function createGlobeScene(container, generator) {
 
   function draw() {
     if (!mesh) return;
-    mesh.rotation.x = rotation.x;
-    mesh.rotation.y = rotation.y;
+    [mesh, ocean, atmosphere].forEach((item) => {
+      item.rotation.x = rotation.x;
+      item.rotation.y = rotation.y;
+    });
     renderer.render(scene, camera);
   }
 
@@ -114,7 +155,8 @@ export function createGlobeScene(container, generator) {
 }
 
 function createTerrainSphere(result, generator) {
-  const geometry = new THREE.SphereGeometry(1.55, 128, 80);
+  const segments = Math.max(64, Math.min(384, result.settings.resolution));
+  const geometry = new THREE.SphereGeometry(1.55, segments, Math.max(48, Math.round(segments * 0.62)));
   const position = geometry.attributes.position;
   const colors = [];
   const normal = new THREE.Vector3();
@@ -132,10 +174,11 @@ function createTerrainSphere(result, generator) {
     normal.set(position.getX(index), position.getY(index), position.getZ(index)).normalize();
     const height = normalizeValue(rawValues[index], low, high);
     const biome = generator.classify(height, result.settings);
-    const elevation = biome === 0 ? -0.02 : 0.015 + height * 0.16 + biome * 0.014;
+    const aboveSea = Math.max(0, height - result.settings.seaLevel);
+    const elevation = biome === 0 ? -0.012 : 0.004 + aboveSea * 0.065 + Math.max(0, biome - 2) * 0.012;
     position.setXYZ(index, normal.x * (1.55 + elevation), normal.y * (1.55 + elevation), normal.z * (1.55 + elevation));
     color.set(preset.biomes[biome].color);
-    const shade = 0.72 + height * 0.32;
+    const shade = biome === 0 ? 0.82 : 0.68 + height * 0.24;
     colors.push(color.r * shade, color.g * shade, color.b * shade);
   }
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));

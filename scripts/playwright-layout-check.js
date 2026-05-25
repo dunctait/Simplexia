@@ -15,7 +15,7 @@ async function checkViewport(browser, repoRoot, viewport) {
       const r = document.querySelector(selector).getBoundingClientRect();
       return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
     };
-    const canvas = rect(document.querySelector('#globe-stage:not([hidden])') ? '#globe-stage' : '#map-canvas');
+    const canvas = rect('#globe-stage');
     const controls = rect('#controls');
     const buttons = Array.from(document.querySelectorAll('button')).map((button) => {
       const r = button.getBoundingClientRect();

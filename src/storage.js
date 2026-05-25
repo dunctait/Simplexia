@@ -39,7 +39,7 @@
       if (!parsed || typeof parsed !== 'object' || !parsed.settings) return null;
       return {
         settings: parsed.settings,
-        view: parsed.view === 'globe' ? 'globe' : 'grid',
+        view: 'globe',
         showGrid: Boolean(parsed.showGrid)
       };
     } catch {
@@ -50,7 +50,7 @@
   function saveSession(session, storage = globalThis.localStorage) {
     const clean = {
       settings: session.settings,
-      view: session.view === 'globe' ? 'globe' : 'grid',
+      view: 'globe',
       showGrid: Boolean(session.showGrid)
     };
     storage.setItem(SESSION_KEY, JSON.stringify(clean));

@@ -7,28 +7,22 @@
   const restoredSession = storage.loadSession();
   const state = {
     settings: generator.normalizeSettings(restoredSession ? restoredSession.settings : undefined),
-    result: null,
-    view: restoredSession ? restoredSession.view : 'globe',
-    showGrid: restoredSession ? restoredSession.showGrid : false
+    result: null
   };
 
-  const ids = [
-    'columns', 'rows', 'octaves', 'roughness', 'scale', 'seaLevel', 'beachLevel', 'mountainLevel',
-    'edgeFade', 'seed', 'radialEnabled', 'showGrid', 'biomePreset', 'summary', 'legend', 'toast',
-    'saveName', 'savedList', 'generation-loading'
-  ];
+  const controlIds = ['resolution', 'continentScale', 'surfaceScale', 'octaves', 'roughness', 'seaLevel', 'beachLevel', 'mountainLevel', 'seed'];
+  const ids = [...controlIds, 'biomePreset', 'summary', 'legend', 'toast', 'saveName', 'savedList', 'generation-loading'];
   const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
-  const outputs = Object.fromEntries(['columns', 'rows', 'octaves', 'roughness', 'scale', 'seaLevel', 'beachLevel', 'mountainLevel', 'edgeFade', 'seed'].map((id) => [id, document.getElementById(`${id}Out`)]));
+  const outputs = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(`${id}Out`)]));
   let renderer = null;
   let activeWorker = null;
   let generationId = 0;
 
   function init({ globeFactory } = {}) {
     renderer = window.IslandRenderer.createRenderer(
-      document.getElementById('map-canvas'),
-      generator,
       document.getElementById('globe-stage'),
-      globeFactory
+      globeFactory,
+      generator
     );
     Object.entries(generator.BIOME_PRESETS).forEach(([id, preset]) => {
       const option = document.createElement('option');
@@ -38,40 +32,21 @@
     });
     bindControls();
     syncControls();
-    syncViewToggle();
-    syncModeControls();
     refreshSaves();
     window.simplexIslands = { state, regenerate };
     regenerate();
   }
 
   function bindControls() {
-    ['columns', 'rows', 'octaves', 'roughness', 'scale', 'seaLevel', 'beachLevel', 'mountainLevel', 'edgeFade', 'seed'].forEach((id) => {
+    controlIds.forEach((id) => {
       el[id].addEventListener('input', () => {
         state.settings[id] = Number(el[id].value);
         regenerate();
       });
     });
-    el.radialEnabled.addEventListener('change', () => {
-      state.settings.radialEnabled = el.radialEnabled.checked;
-      regenerate();
-    });
-    el.showGrid.addEventListener('change', () => {
-      state.showGrid = el.showGrid.checked;
-      render();
-      persistSession();
-    });
     el.biomePreset.addEventListener('change', () => {
       state.settings.biomePreset = el.biomePreset.value;
       regenerate();
-    });
-    document.querySelectorAll('[data-view]').forEach((button) => {
-      button.addEventListener('click', () => {
-        state.view = button.dataset.view;
-        syncViewToggle();
-        syncModeControls();
-        regenerate();
-      });
     });
     document.getElementById('randomize').addEventListener('click', () => {
       state.settings.seed = Math.floor(Math.random() * 256);
@@ -80,11 +55,7 @@
     });
     document.getElementById('reset').addEventListener('click', () => {
       state.settings = generator.normalizeSettings();
-      state.view = 'grid';
-      state.showGrid = false;
       syncControls();
-      syncViewToggle();
-      syncModeControls();
       regenerate();
     });
     document.getElementById('copy-export').addEventListener('click', copyExport);
@@ -100,9 +71,8 @@
   function regenerate() {
     state.settings = generator.normalizeSettings(state.settings);
     syncControls();
-    syncModeControls();
     persistSession();
-    startGeneration(effectiveGenerationSettings());
+    startGeneration(state.settings);
   }
 
   function startGeneration(settings) {
@@ -111,25 +81,23 @@
     if (activeWorker) activeWorker.terminate();
     setLoading(true);
     if (!window.Worker) {
-      setTimeout(() => finishGeneration(id, state.view === 'globe' ? generator.generateGlobe(settings) : generator.generate(settings)), 0);
+      setTimeout(() => finishGeneration(id, generator.generateGlobe(settings)), 0);
       return;
     }
     try {
       activeWorker = new Worker('src/generation-worker.js');
     } catch {
-      setTimeout(() => finishGeneration(id, state.view === 'globe' ? generator.generateGlobe(settings) : generator.generate(settings)), 0);
+      setTimeout(() => finishGeneration(id, generator.generateGlobe(settings)), 0);
       return;
     }
-    activeWorker.onmessage = (event) => {
-      finishGeneration(event.data.id, event.data.result);
-    };
+    activeWorker.onmessage = (event) => finishGeneration(event.data.id, event.data.result);
     activeWorker.onerror = (event) => {
       if (id !== generationId) return;
       activeWorker = null;
       setLoading(false);
       showToast(event.message || 'Generation failed');
     };
-    activeWorker.postMessage({ id, settings, view: state.view });
+    activeWorker.postMessage({ id, settings, view: 'globe' });
   }
 
   function finishGeneration(id, result) {
@@ -145,7 +113,7 @@
 
   function render() {
     if (!state.result) return;
-    renderer.render(state.result, { view: state.view, showGrid: state.showGrid });
+    renderer.render(state.result);
     updateSummary();
     updateLegend();
   }
@@ -155,39 +123,11 @@
       el[id].value = state.settings[id];
       output.textContent = formatValue(state.settings[id]);
     });
-    el.radialEnabled.checked = state.settings.radialEnabled;
-    el.showGrid.checked = state.showGrid;
     el.biomePreset.value = state.settings.biomePreset;
   }
 
-  function syncViewToggle() {
-    document.querySelectorAll('[data-view]').forEach((item) => {
-      item.classList.toggle('is-active', item.dataset.view === state.view);
-    });
-  }
-
-  function syncModeControls() {
-    document.querySelectorAll('.grid-mask-control').forEach((item) => {
-      item.classList.toggle('is-muted', state.view === 'globe');
-      item.title = state.view === 'globe' ? 'Grid-only island mask control' : '';
-    });
-  }
-
-  function effectiveGenerationSettings() {
-    if (state.view !== 'globe') return state.settings;
-    return {
-      ...state.settings,
-      edgeFade: 0,
-      radialEnabled: false
-    };
-  }
-
   function persistSession() {
-    storage.saveSession({
-      settings: state.settings,
-      view: state.view,
-      showGrid: state.showGrid
-    });
+    storage.saveSession({ settings: state.settings, view: 'globe', showGrid: false });
   }
 
   function setLoading(isLoading) {
@@ -240,13 +180,11 @@
   }
 
   function selectedSave() {
-    const saves = storage.loadAll();
-    return saves.find((save) => save.id === el.savedList.value);
+    return storage.loadAll().find((save) => save.id === el.savedList.value);
   }
 
   function refreshSaves() {
-    const saves = storage.loadAll();
-    el.savedList.replaceChildren(...saves.map((save) => {
+    el.savedList.replaceChildren(...storage.loadAll().map((save) => {
       const option = document.createElement('option');
       option.value = save.id;
       option.textContent = `${save.name} | seed ${save.settings.seed}`;
@@ -262,7 +200,7 @@
   }
 
   function formatValue(value) {
-    return Number.isInteger(value) ? value : Number(value).toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+    return Number.isInteger(value) ? value : Number(value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   }
 
   return { init };

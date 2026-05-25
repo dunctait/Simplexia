@@ -3,18 +3,19 @@ const assert = require('node:assert/strict');
 const generator = require('../src/generator.js');
 
 test('generation is deterministic for fixed settings', () => {
-  const settings = generator.normalizeSettings({ seed: 42, columns: 64, rows: 64 });
+  const settings = generator.normalizeSettings({ seed: 42, resolution: 96 });
   const first = generator.generate(settings);
   const second = generator.generate(settings);
-  assert.equal(first.values[20][20], second.values[20][20]);
+  assert.equal(first.globe, true);
   assert.deepEqual(first.summary.counts, second.summary.counts);
 });
 
-test('generated values are normalized and match requested dimensions', () => {
-  const result = generator.generate({ columns: 72, rows: 56, seed: 7 });
-  assert.equal(result.values.length, 56);
-  assert.equal(result.values[0].length, 72);
-  assert.ok(result.values.every((row) => Array.from(row).every((value) => value >= 0 && value <= 1)));
+test('globe generation has normalized summary values', () => {
+  const result = generator.generateGlobe({ resolution: 96, seed: 7 });
+  assert.equal(result.globe, true);
+  assert.equal(result.values, undefined);
+  assert.ok(result.summary.water >= 0 && result.summary.water <= 1);
+  assert.ok(result.summary.land >= 0 && result.summary.land <= 1);
 });
 
 test('thresholds remain ordered when normalized', () => {
@@ -23,10 +24,14 @@ test('thresholds remain ordered when normalized', () => {
   assert.ok(settings.beachLevel < settings.mountainLevel);
 });
 
-test('dimensions normalize up to 2048', () => {
-  const settings = generator.normalizeSettings({ columns: 5000, rows: 4096 });
-  assert.equal(settings.columns, 2048);
-  assert.equal(settings.rows, 2048);
+test('resolution normalizes to globe rendering range', () => {
+  const settings = generator.normalizeSettings({ resolution: 5000 });
+  assert.equal(settings.resolution, 384);
+});
+
+test('legacy rows and columns normalize into resolution', () => {
+  const settings = generator.normalizeSettings({ columns: 2048, rows: 1024 });
+  assert.equal(settings.resolution, 384);
 });
 
 test('globe generation produces deterministic summary without grid values', () => {

@@ -12770,6 +12770,206 @@ var IslandGlobeBundle = (() => {
       return this;
     }
   };
+  var MeshPhysicalMaterial = class extends MeshStandardMaterial {
+    /**
+     * Constructs a new mesh physical material.
+     *
+     * @param {Object} [parameters] - An object with one or more properties
+     * defining the material's appearance. Any property of the material
+     * (including any property from inherited materials) can be passed
+     * in here. Color values can be passed any type of value accepted
+     * by {@link Color#set}.
+     */
+    constructor(parameters) {
+      super();
+      this.isMeshPhysicalMaterial = true;
+      this.defines = {
+        "STANDARD": "",
+        "PHYSICAL": ""
+      };
+      this.type = "MeshPhysicalMaterial";
+      this.anisotropyRotation = 0;
+      this.anisotropyMap = null;
+      this.clearcoatMap = null;
+      this.clearcoatRoughness = 0;
+      this.clearcoatRoughnessMap = null;
+      this.clearcoatNormalScale = new Vector2(1, 1);
+      this.clearcoatNormalMap = null;
+      this.ior = 1.5;
+      Object.defineProperty(this, "reflectivity", {
+        get: function() {
+          return clamp(2.5 * (this.ior - 1) / (this.ior + 1), 0, 1);
+        },
+        set: function(reflectivity) {
+          this.ior = (1 + 0.4 * reflectivity) / (1 - 0.4 * reflectivity);
+        }
+      });
+      this.iridescenceMap = null;
+      this.iridescenceIOR = 1.3;
+      this.iridescenceThicknessRange = [100, 400];
+      this.iridescenceThicknessMap = null;
+      this.sheenColor = new Color(0);
+      this.sheenColorMap = null;
+      this.sheenRoughness = 1;
+      this.sheenRoughnessMap = null;
+      this.transmissionMap = null;
+      this.thickness = 0;
+      this.thicknessMap = null;
+      this.attenuationDistance = Infinity;
+      this.attenuationColor = new Color(1, 1, 1);
+      this.specularIntensity = 1;
+      this.specularIntensityMap = null;
+      this.specularColor = new Color(1, 1, 1);
+      this.specularColorMap = null;
+      this._anisotropy = 0;
+      this._clearcoat = 0;
+      this._dispersion = 0;
+      this._iridescence = 0;
+      this._sheen = 0;
+      this._transmission = 0;
+      this.setValues(parameters);
+    }
+    /**
+     * The anisotropy strength, from `0.0` to `1.0`.
+     *
+     * @type {number}
+     * @default 0
+     */
+    get anisotropy() {
+      return this._anisotropy;
+    }
+    set anisotropy(value) {
+      if (this._anisotropy > 0 !== value > 0) {
+        this.version++;
+      }
+      this._anisotropy = value;
+    }
+    /**
+     * Represents the intensity of the clear coat layer, from `0.0` to `1.0`. Use
+     * clear coat related properties to enable multilayer materials that have a
+     * thin translucent layer over the base layer.
+     *
+     * @type {number}
+     * @default 0
+     */
+    get clearcoat() {
+      return this._clearcoat;
+    }
+    set clearcoat(value) {
+      if (this._clearcoat > 0 !== value > 0) {
+        this.version++;
+      }
+      this._clearcoat = value;
+    }
+    /**
+     * The intensity of the iridescence layer, simulating RGB color shift based on the angle between
+     * the surface and the viewer, from `0.0` to `1.0`.
+     *
+     * @type {number}
+     * @default 0
+     */
+    get iridescence() {
+      return this._iridescence;
+    }
+    set iridescence(value) {
+      if (this._iridescence > 0 !== value > 0) {
+        this.version++;
+      }
+      this._iridescence = value;
+    }
+    /**
+     * Defines the strength of the angular separation of colors (chromatic aberration) transmitting
+     * through a relatively clear volume. Any value zero or larger is valid, the typical range of
+     * realistic values is `[0, 1]`. This property can be only be used with transmissive objects.
+     *
+     * @type {number}
+     * @default 0
+     */
+    get dispersion() {
+      return this._dispersion;
+    }
+    set dispersion(value) {
+      if (this._dispersion > 0 !== value > 0) {
+        this.version++;
+      }
+      this._dispersion = value;
+    }
+    /**
+     * The intensity of the sheen layer, from `0.0` to `1.0`.
+     *
+     * @type {number}
+     * @default 0
+     */
+    get sheen() {
+      return this._sheen;
+    }
+    set sheen(value) {
+      if (this._sheen > 0 !== value > 0) {
+        this.version++;
+      }
+      this._sheen = value;
+    }
+    /**
+     * Degree of transmission (or optical transparency), from `0.0` to `1.0`.
+     *
+     * Thin, transparent or semitransparent, plastic or glass materials remain
+     * largely reflective even if they are fully transmissive. The transmission
+     * property can be used to model these materials.
+     *
+     * When transmission is non-zero, `opacity` should be  set to `1`.
+     *
+     * @type {number}
+     * @default 0
+     */
+    get transmission() {
+      return this._transmission;
+    }
+    set transmission(value) {
+      if (this._transmission > 0 !== value > 0) {
+        this.version++;
+      }
+      this._transmission = value;
+    }
+    copy(source) {
+      super.copy(source);
+      this.defines = {
+        "STANDARD": "",
+        "PHYSICAL": ""
+      };
+      this.anisotropy = source.anisotropy;
+      this.anisotropyRotation = source.anisotropyRotation;
+      this.anisotropyMap = source.anisotropyMap;
+      this.clearcoat = source.clearcoat;
+      this.clearcoatMap = source.clearcoatMap;
+      this.clearcoatRoughness = source.clearcoatRoughness;
+      this.clearcoatRoughnessMap = source.clearcoatRoughnessMap;
+      this.clearcoatNormalMap = source.clearcoatNormalMap;
+      this.clearcoatNormalScale.copy(source.clearcoatNormalScale);
+      this.dispersion = source.dispersion;
+      this.ior = source.ior;
+      this.iridescence = source.iridescence;
+      this.iridescenceMap = source.iridescenceMap;
+      this.iridescenceIOR = source.iridescenceIOR;
+      this.iridescenceThicknessRange = [...source.iridescenceThicknessRange];
+      this.iridescenceThicknessMap = source.iridescenceThicknessMap;
+      this.sheen = source.sheen;
+      this.sheenColor.copy(source.sheenColor);
+      this.sheenColorMap = source.sheenColorMap;
+      this.sheenRoughness = source.sheenRoughness;
+      this.sheenRoughnessMap = source.sheenRoughnessMap;
+      this.transmission = source.transmission;
+      this.transmissionMap = source.transmissionMap;
+      this.thickness = source.thickness;
+      this.thicknessMap = source.thicknessMap;
+      this.attenuationDistance = source.attenuationDistance;
+      this.attenuationColor.copy(source.attenuationColor);
+      this.specularIntensity = source.specularIntensity;
+      this.specularIntensityMap = source.specularIntensityMap;
+      this.specularColor.copy(source.specularColor);
+      this.specularColorMap = source.specularColorMap;
+      return this;
+    }
+  };
   var MeshDepthMaterial = class extends Material {
     /**
      * Constructs a new mesh depth material.
@@ -13856,6 +14056,33 @@ var IslandGlobeBundle = (() => {
       return data;
     }
   };
+  var HemisphereLight = class extends Light {
+    /**
+     * Constructs a new hemisphere light.
+     *
+     * @param {(number|Color|string)} [skyColor=0xffffff] - The light's sky color.
+     * @param {(number|Color|string)} [groundColor=0xffffff] - The light's ground color.
+     * @param {number} [intensity=1] - The light's strength/intensity.
+     */
+    constructor(skyColor, groundColor, intensity) {
+      super(skyColor, intensity);
+      this.isHemisphereLight = true;
+      this.type = "HemisphereLight";
+      this.position.copy(Object3D.DEFAULT_UP);
+      this.updateMatrix();
+      this.groundColor = new Color(groundColor);
+    }
+    copy(source, recursive) {
+      super.copy(source, recursive);
+      this.groundColor.copy(source.groundColor);
+      return this;
+    }
+    toJSON(meta) {
+      const data = super.toJSON(meta);
+      data.object.groundColor = this.groundColor.getHex();
+      return data;
+    }
+  };
   var _projScreenMatrix = /* @__PURE__ */ new Matrix4();
   var _lightPositionWorld = /* @__PURE__ */ new Vector3();
   var _lookTarget = /* @__PURE__ */ new Vector3();
@@ -14486,19 +14713,6 @@ var IslandGlobeBundle = (() => {
       data.object.shadow = this.shadow.toJSON();
       data.object.target = this.target.uuid;
       return data;
-    }
-  };
-  var AmbientLight = class extends Light {
-    /**
-     * Constructs a new ambient light.
-     *
-     * @param {(number|Color|string)} [color=0xffffff] - The light's color.
-     * @param {number} [intensity=1] - The light's strength/intensity.
-     */
-    constructor(color, intensity) {
-      super(color, intensity);
-      this.isAmbientLight = true;
-      this.type = "AmbientLight";
     }
   };
   var fov = -90;
@@ -26692,17 +26906,19 @@ void main() {
   // src/globe-scene.js
   function createGlobeScene(container, generator) {
     const scene = new Scene();
-    scene.background = new Color(725273);
+    scene.background = new Color(329741);
     const camera = new PerspectiveCamera(42, 1, 0.1, 100);
     camera.position.set(0, 0.18, 5.35);
     const renderer = new WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     container.replaceChildren(renderer.domElement);
-    const key = new DirectionalLight(16777215, 2.3);
-    key.position.set(3, 2, 4);
+    const key = new DirectionalLight(16774879, 3.1);
+    key.position.set(4, 1.8, 3.2);
     scene.add(key);
-    scene.add(new AmbientLight(10465981, 1.15));
+    scene.add(new HemisphereLight(14086143, 329484, 0.72));
     let mesh = null;
+    let ocean = null;
+    let atmosphere = null;
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
@@ -26748,16 +26964,53 @@ void main() {
         mesh.material.dispose();
         scene.remove(mesh);
       }
+      if (ocean) {
+        ocean.geometry.dispose();
+        ocean.material.dispose();
+        scene.remove(ocean);
+      }
+      if (atmosphere) {
+        atmosphere.geometry.dispose();
+        atmosphere.material.dispose();
+        scene.remove(atmosphere);
+      }
       const geometry = createTerrainSphere(result, generator);
       const material = new MeshStandardMaterial({
         vertexColors: true,
-        roughness: 0.92,
+        roughness: 0.78,
         metalness: 0,
         flatShading: false
       });
       mesh = new Mesh(geometry, material);
-      mesh.rotation.set(rotation.x, rotation.y, 0);
+      ocean = new Mesh(
+        new SphereGeometry(1.552, 128, 80),
+        new MeshPhysicalMaterial({
+          color: 1457525,
+          transparent: true,
+          opacity: 0.54,
+          roughness: 0.18,
+          metalness: 0,
+          transmission: 0,
+          clearcoat: 1,
+          clearcoatRoughness: 0.1,
+          depthWrite: false
+        })
+      );
+      atmosphere = new Mesh(
+        new SphereGeometry(1.64, 128, 80),
+        new MeshBasicMaterial({
+          color: 8370175,
+          transparent: true,
+          opacity: 0.13,
+          blending: AdditiveBlending,
+          side: BackSide,
+          depthWrite: false
+        })
+      );
+      [mesh, ocean, atmosphere].forEach((item) => item.rotation.set(rotation.x, rotation.y, 0));
       scene.add(mesh);
+      scene.add(ocean);
+      scene.add(atmosphere);
       draw();
     }
     function resize() {
@@ -26769,8 +27022,10 @@ void main() {
     }
     function draw() {
       if (!mesh) return;
-      mesh.rotation.x = rotation.x;
-      mesh.rotation.y = rotation.y;
+      [mesh, ocean, atmosphere].forEach((item) => {
+        item.rotation.x = rotation.x;
+        item.rotation.y = rotation.y;
+      });
       renderer.render(scene, camera);
     }
     function animate() {
@@ -26791,7 +27046,8 @@ void main() {
     return { render, resize };
   }
   function createTerrainSphere(result, generator) {
-    const geometry = new SphereGeometry(1.55, 128, 80);
+    const segments = Math.max(64, Math.min(384, result.settings.resolution));
+    const geometry = new SphereGeometry(1.55, segments, Math.max(48, Math.round(segments * 0.62)));
     const position = geometry.attributes.position;
     const colors = [];
     const normal = new Vector3();
@@ -26809,10 +27065,11 @@ void main() {
       normal.set(position.getX(index), position.getY(index), position.getZ(index)).normalize();
       const height = normalizeValue(rawValues[index], low, high);
       const biome = generator.classify(height, result.settings);
-      const elevation = biome === 0 ? -0.02 : 0.015 + height * 0.16 + biome * 0.014;
+      const aboveSea = Math.max(0, height - result.settings.seaLevel);
+      const elevation = biome === 0 ? -0.012 : 4e-3 + aboveSea * 0.065 + Math.max(0, biome - 2) * 0.012;
       position.setXYZ(index, normal.x * (1.55 + elevation), normal.y * (1.55 + elevation), normal.z * (1.55 + elevation));
       color.set(preset.biomes[biome].color);
-      const shade = 0.72 + height * 0.32;
+      const shade = biome === 0 ? 0.82 : 0.68 + height * 0.24;
       colors.push(color.r * shade, color.g * shade, color.b * shade);
     }
     geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
