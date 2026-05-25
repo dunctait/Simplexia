@@ -43,15 +43,9 @@
     controlIds.forEach((id) => {
       el[id].addEventListener('input', () => {
         state.settings[id] = Number(el[id].value);
-        syncControls();
+        syncControlOutput(id);
         persistSession();
         scheduleGeneration();
-      });
-      el[id].addEventListener('change', () => {
-        state.settings[id] = Number(el[id].value);
-        syncControls();
-        persistSession();
-        regenerateNow();
       });
     });
     el.biomePreset.addEventListener('change', () => {
@@ -155,11 +149,15 @@
   }
 
   function syncControls() {
-    Object.entries(outputs).forEach(([id, output]) => {
+    controlIds.forEach((id) => {
       el[id].value = state.settings[id];
-      output.textContent = formatValue(state.settings[id]);
+      syncControlOutput(id);
     });
     el.biomePreset.value = state.settings.biomePreset;
+  }
+
+  function syncControlOutput(id) {
+    outputs[id].textContent = formatValue(state.settings[id]);
   }
 
   function persistSession() {

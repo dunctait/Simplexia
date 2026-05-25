@@ -41,13 +41,23 @@ async function main() {
     throw new Error('Loading overlay appeared while the slider was still moving');
   }
   await page.waitForFunction(() => document.querySelector('#globe-stage').dataset.resolution === '96');
+  const lowResolutionValue = await page.locator('#resolution').inputValue();
+  const lowResolutionOutput = await page.locator('#resolutionOut').textContent();
   const lowResolutionVertexCount = await page.locator('#globe-stage').evaluate((stage) => Number(stage.dataset.vertexCount));
+  if (lowResolutionValue !== '96' || lowResolutionOutput !== '96') {
+    throw new Error(`Resolution snapped back after release: input=${lowResolutionValue}, output=${lowResolutionOutput}`);
+  }
   await page.locator('#resolution').evaluate((input) => {
     input.value = '224';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.waitForFunction(() => document.querySelector('#globe-stage').dataset.resolution === '224');
+  const highResolutionValue = await page.locator('#resolution').inputValue();
+  const highResolutionOutput = await page.locator('#resolutionOut').textContent();
   const highResolutionVertexCount = await page.locator('#globe-stage').evaluate((stage) => Number(stage.dataset.vertexCount));
+  if (highResolutionValue !== '224' || highResolutionOutput !== '224') {
+    throw new Error(`Resolution snapped back after release: input=${highResolutionValue}, output=${highResolutionOutput}`);
+  }
   if (!(highResolutionVertexCount > lowResolutionVertexCount)) {
     throw new Error(`Resolution did not change mesh complexity: high=${highResolutionVertexCount}, low=${lowResolutionVertexCount}`);
   }
