@@ -28430,8 +28430,9 @@ void main() {
         fish.forEach((meshItem, index) => {
           const jump = fishJumpData[index];
           const t = elapsed * jump.speed + jump.offset;
-          const rise = Math.max(0, Math.sin(t));
-          const s = 1.558 + rise * jump.height;
+          const wave = Math.sin(t);
+          const normalized = 0.5 + 0.5 * wave;
+          const s = jump.surfaceRadius - jump.submergeDepth + normalized * (jump.submergeDepth + jump.jumpHeight);
           meshItem.position.set(jump.normal.x * s, jump.normal.y * s, jump.normal.z * s);
           meshItem.lookAt(meshItem.position.clone().add(jump.tangent));
         });
@@ -28579,9 +28580,11 @@ void main() {
       fishJumpData.push({
         normal,
         tangent,
+        surfaceRadius: 1.558,
+        submergeDepth: 0.03 + random() * 0.02,
         speed: 1.6 + random() * 1.9,
         offset: random() * Math.PI * 2,
-        height: 0.06 + random() * 0.08
+        jumpHeight: 0.07 + random() * 0.1
       });
     }
     return { fish, fishJumpData };
