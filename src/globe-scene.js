@@ -36,9 +36,13 @@ export function createGlobeScene(container, generator) {
   let velocityX = 0;
   let velocityY = 0;
   let autoSpin = true;
+  const qDelta = new THREE.Quaternion();
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  const localRight = new THREE.Vector3();
+  const initialEuler = new THREE.Euler(-0.2, -0.45, 0, 'YXZ');
+  planetGroup.quaternion.setFromEuler(initialEuler);
   const pointers = new Map();
   let pinchDistance = 0;
-  const rotation = { x: -0.2, y: -0.45 };
 
   container.addEventListener('touchmove', (event) => event.preventDefault(), { passive: false });
   container.addEventListener('wheel', (event) => {
@@ -65,7 +69,7 @@ export function createGlobeScene(container, generator) {
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       const nextDistance = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinchDistance > 0) applyZoom((pinchDistance - nextDistance) * 0.0065);
+      if (pinchDistance > 0) applyZoom((pinchDistance - nextDistance) * 0.0105);
       pinchDistance = nextDistance;
       return;
     }
@@ -74,10 +78,9 @@ export function createGlobeScene(container, generator) {
     const dx = event.clientX - lastX;
     const dy = event.clientY - lastY;
     if (dx !== 0 || dy !== 0) autoSpin = false;
-    velocityY = dx * 0.018;
-    velocityX = dy * 0.014;
-    rotation.y += velocityY;
-    rotation.x += velocityX;
+    velocityY = dx * 0.011;
+    velocityX = dy * 0.0085;
+    applyOrbitDelta(velocityY, velocityX);
     lastX = event.clientX;
     lastY = event.clientY;
     draw();
@@ -99,6 +102,19 @@ export function createGlobeScene(container, generator) {
     camera.position.z = cameraDistance;
     camera.updateProjectionMatrix();
     draw();
+  }
+
+  function applyOrbitDelta(deltaYaw, deltaPitch) {
+    if (!mesh) return;
+    if (deltaYaw) {
+      qDelta.setFromAxisAngle(worldUp, deltaYaw);
+      planetGroup.quaternion.premultiply(qDelta);
+    }
+    if (deltaPitch) {
+      localRight.set(1, 0, 0).applyQuaternion(planetGroup.quaternion).normalize();
+      qDelta.setFromAxisAngle(localRight, deltaPitch);
+      planetGroup.quaternion.premultiply(qDelta);
+    }
   }
 
   function render(result) {
@@ -184,16 +200,13 @@ export function createGlobeScene(container, generator) {
 
   function draw() {
     if (!mesh) return;
-    planetGroup.rotation.x = rotation.x;
-    planetGroup.rotation.y = rotation.y;
     renderer.render(scene, camera);
   }
 
   function animate() {
     if (mesh && !container.hidden) {
       if (!dragging && pointers.size < 2) {
-        rotation.x += velocityX;
-        rotation.y += velocityY || (autoSpin ? 0.0032 : 0);
+        applyOrbitDelta(velocityY || (autoSpin ? 0.0032 : 0), velocityX);
         velocityX *= 0.94;
         velocityY *= 0.94;
         if (Math.abs(velocityX) < 0.0004) velocityX = 0;
