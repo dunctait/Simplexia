@@ -44,7 +44,7 @@ export function createGlobeScene(container, generator) {
   let autoSpin = true;
   const qDelta = new THREE.Quaternion();
   const worldUp = new THREE.Vector3(0, 1, 0);
-  const localRight = new THREE.Vector3();
+  const cameraRight = new THREE.Vector3(1, 0, 0);
   const initialEuler = new THREE.Euler(-0.2, -0.45, 0, 'YXZ');
   planetGroup.quaternion.setFromEuler(initialEuler);
   const pointers = new Map();
@@ -117,8 +117,7 @@ export function createGlobeScene(container, generator) {
       planetGroup.quaternion.premultiply(qDelta);
     }
     if (deltaPitch) {
-      localRight.set(1, 0, 0).applyQuaternion(planetGroup.quaternion).normalize();
-      qDelta.setFromAxisAngle(localRight, deltaPitch);
+      qDelta.setFromAxisAngle(cameraRight, deltaPitch);
       planetGroup.quaternion.premultiply(qDelta);
     }
   }

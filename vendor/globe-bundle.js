@@ -28259,7 +28259,7 @@ void main() {
     let autoSpin = true;
     const qDelta = new Quaternion();
     const worldUp = new Vector3(0, 1, 0);
-    const localRight = new Vector3();
+    const cameraRight = new Vector3(1, 0, 0);
     const initialEuler = new Euler(-0.2, -0.45, 0, "YXZ");
     planetGroup.quaternion.setFromEuler(initialEuler);
     const pointers = /* @__PURE__ */ new Map();
@@ -28329,8 +28329,7 @@ void main() {
         planetGroup.quaternion.premultiply(qDelta);
       }
       if (deltaPitch) {
-        localRight.set(1, 0, 0).applyQuaternion(planetGroup.quaternion).normalize();
-        qDelta.setFromAxisAngle(localRight, deltaPitch);
+        qDelta.setFromAxisAngle(cameraRight, deltaPitch);
         planetGroup.quaternion.premultiply(qDelta);
       }
     }
