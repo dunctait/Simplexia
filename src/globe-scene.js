@@ -234,11 +234,20 @@ export function createGlobeScene(container, generator) {
       fish.forEach((meshItem, index) => {
         const jump = fishJumpData[index];
         const t = elapsed * jump.speed + jump.offset;
+        const swimX = Math.cos(t * 0.9) * jump.swimRadius;
+        const swimY = Math.sin(t * 0.9) * jump.swimRadius;
+        const onSurface = new THREE.Vector3()
+          .copy(jump.normal)
+          .multiplyScalar(jump.surfaceRadius)
+          .addScaledVector(jump.tangent, swimX)
+          .addScaledVector(jump.bitangent, swimY)
+          .normalize();
         const wave = Math.sin(t);
         const normalized = 0.5 + 0.5 * wave;
-        const s = jump.surfaceRadius - jump.submergeDepth + normalized * (jump.submergeDepth + jump.jumpHeight);
-        meshItem.position.set(jump.normal.x * s, jump.normal.y * s, jump.normal.z * s);
-        meshItem.lookAt(meshItem.position.clone().add(jump.tangent));
+        const radius = jump.surfaceRadius - jump.submergeDepth + normalized * (jump.submergeDepth + jump.jumpHeight);
+        meshItem.position.copy(onSurface).multiplyScalar(radius);
+        if (wave >= 0) meshItem.lookAt(meshItem.position.clone().add(onSurface));
+        else meshItem.lookAt(meshItem.position.clone().addScaledVector(onSurface, -1));
       });
       animals.forEach((animal, index) => {
         const bob = 0.007 * Math.sin(elapsed * (1.7 + index * 0.2) + index);
@@ -428,14 +437,17 @@ function createSeaFish(seaNormals, playful, seed) {
     const tangent = new THREE.Vector3().crossVectors(normal, new THREE.Vector3(0, 1, 0));
     if (tangent.lengthSq() < 0.001) tangent.set(1, 0, 0);
     tangent.normalize();
+    const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
     const geometry = fishPrototypeGeometry ? fishPrototypeGeometry.clone() : new THREE.BoxGeometry(0.03, 0.03, 0.09);
     const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.06, emissive: color, emissiveIntensity: 0.14 }));
     fish.push(mesh);
     fishJumpData.push({
       normal,
       tangent,
+      bitangent,
       surfaceRadius: 1.558,
       submergeDepth: 0.03 + random() * 0.02,
+      swimRadius: 0.035 + random() * 0.03,
       speed: 1.6 + random() * 1.9,
       offset: random() * Math.PI * 2,
       jumpHeight: 0.07 + random() * 0.1
