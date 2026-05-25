@@ -10,8 +10,9 @@
     result: null
   };
 
-  const controlIds = ['resolution', 'continentScale', 'surfaceScale', 'octaves', 'roughness', 'seaLevel', 'beachLevel', 'mountainLevel', 'seed'];
-  const ids = [...controlIds, 'biomePreset', 'summary', 'legend', 'toast', 'saveName', 'savedList', 'generation-loading'];
+  const controlIds = ['resolution', 'landmassFrequency', 'surfaceScale', 'octaves', 'roughness', 'seaLevel', 'beachLevel', 'mountainLevel', 'seed'];
+  const toggleIds = ['playfulPalette', 'showClouds', 'showRings', 'showMoons', 'showFish'];
+  const ids = [...controlIds, ...toggleIds, 'biomePreset', 'summary', 'legend', 'toast', 'saveName', 'savedList', 'generation-loading'];
   const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
   const outputs = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(`${id}Out`)]));
   let renderer = null;
@@ -44,6 +45,13 @@
       el[id].addEventListener('input', () => {
         state.settings[id] = Number(el[id].value);
         syncControlOutput(id);
+        persistSession();
+        scheduleGeneration();
+      });
+    });
+    toggleIds.forEach((id) => {
+      el[id].addEventListener('change', () => {
+        state.settings[id] = el[id].checked ? 1 : 0;
         persistSession();
         scheduleGeneration();
       });
@@ -152,6 +160,9 @@
     controlIds.forEach((id) => {
       el[id].value = state.settings[id];
       syncControlOutput(id);
+    });
+    toggleIds.forEach((id) => {
+      el[id].checked = Boolean(state.settings[id]);
     });
     el.biomePreset.value = state.settings.biomePreset;
   }

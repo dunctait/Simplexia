@@ -34,6 +34,20 @@ test('legacy rows and columns normalize into resolution', () => {
   assert.equal(settings.resolution, 384);
 });
 
+test('legacy continentScale normalizes into landmassFrequency', () => {
+  const settings = generator.normalizeSettings({ continentScale: 2.1 });
+  assert.equal(settings.landmassFrequency, 2.1);
+});
+
+test('planet feature toggles are normalized as binary flags', () => {
+  const settings = generator.normalizeSettings({ showRings: 7, showMoons: -1, showClouds: 0, showFish: 1, playfulPalette: 3 });
+  assert.equal(settings.showRings, 1);
+  assert.equal(settings.showMoons, 0);
+  assert.equal(settings.showClouds, 0);
+  assert.equal(settings.showFish, 1);
+  assert.equal(settings.playfulPalette, 1);
+});
+
 test('globe generation produces deterministic summary without grid values', () => {
   const first = generator.generateGlobe({ seed: 12, octaves: 5 });
   const second = generator.generateGlobe({ seed: 12, octaves: 5 });

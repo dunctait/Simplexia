@@ -4,13 +4,18 @@
 })(typeof self !== 'undefined' ? self : this, function (SimplexNoise) {
   const DEFAULT_SETTINGS = Object.freeze({
     resolution: 160,
-    continentScale: 1.15,
+    landmassFrequency: 1.15,
     surfaceScale: 2.2,
     octaves: 4,
     roughness: 0.66,
     seaLevel: 0.21,
     beachLevel: 0.27,
     mountainLevel: 0.6,
+    playfulPalette: 1,
+    showRings: 0,
+    showMoons: 1,
+    showClouds: 1,
+    showFish: 0,
     biomePreset: 'classic',
     seed: 0
   });
@@ -49,8 +54,9 @@
     const settings = { ...DEFAULT_SETTINGS, ...input };
     if (input.columns || input.rows) settings.resolution = Math.round(Math.max(input.columns || 0, input.rows || 0) / 8) * 8;
     if (input.scale && !input.surfaceScale) settings.surfaceScale = clampNumber(input.scale * 180, 1, 9);
+    if (input.continentScale && !input.landmassFrequency) settings.landmassFrequency = input.continentScale;
     settings.resolution = clampInt(settings.resolution, 64, 384);
-    settings.continentScale = clampNumber(settings.continentScale, 0.45, 2.8);
+    settings.landmassFrequency = clampNumber(settings.landmassFrequency, 0.45, 2.8);
     settings.surfaceScale = clampNumber(settings.surfaceScale, 1, 9);
     settings.octaves = clampInt(settings.octaves, 1, 8);
     settings.roughness = clampNumber(settings.roughness, 0.1, 1);
@@ -58,6 +64,11 @@
     settings.seaLevel = clampNumber(settings.seaLevel, 0.05, 0.55);
     settings.beachLevel = clampNumber(Math.max(settings.beachLevel, settings.seaLevel + 0.01), 0.08, 0.7);
     settings.mountainLevel = clampNumber(Math.max(settings.mountainLevel, settings.beachLevel + 0.01), 0.3, 0.95);
+    settings.playfulPalette = clampInt(settings.playfulPalette, 0, 1);
+    settings.showRings = clampInt(settings.showRings, 0, 1);
+    settings.showMoons = clampInt(settings.showMoons, 0, 1);
+    settings.showClouds = clampInt(settings.showClouds, 0, 1);
+    settings.showFish = clampInt(settings.showFish, 0, 1);
     settings.biomePreset = BIOME_PRESETS[settings.biomePreset] ? settings.biomePreset : DEFAULT_SETTINGS.biomePreset;
     return settings;
   }
@@ -110,7 +121,7 @@
   function createSphericalSampler(input) {
     const settings = normalizeSettings(input);
     const simplex = SimplexNoise.create(settings.seed);
-    const continentFrequency = settings.continentScale;
+    const continentFrequency = settings.landmassFrequency;
     const detailBaseFrequency = settings.surfaceScale;
     return (nx, ny, nz) => {
       const continentRaw = triPlanarNoise(simplex, nx, ny, nz, continentFrequency, 0);

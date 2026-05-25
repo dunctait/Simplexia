@@ -37,7 +37,7 @@
 
       <div class="control-grid">
         <label class="field"><span>Resolution <output id="resolutionOut"></output></span><input id="resolution" type="range" min="64" max="384" step="1"></label>
-        <label class="field"><span>Landmass Scale <output id="continentScaleOut"></output></span><input id="continentScale" type="range" min="0.45" max="2.8" step="0.05"></label>
+        <label class="field"><span>Landmass Frequency <output id="landmassFrequencyOut"></output></span><input id="landmassFrequency" type="range" min="0.45" max="2.8" step="0.05"></label>
         <label class="field"><span>Surface Detail <output id="surfaceScaleOut"></output></span><input id="surfaceScale" type="range" min="1" max="9" step="0.1"></label>
         <label class="field"><span>Octaves <output id="octavesOut"></output></span><input id="octaves" type="range" min="1" max="8" step="1"></label>
         <label class="field"><span>Roughness <output id="roughnessOut"></output></span><input id="roughness" type="range" min="0.1" max="1" step="0.01"></label>
@@ -45,6 +45,13 @@
         <label class="field"><span>Beach Line <output id="beachLevelOut"></output></span><input id="beachLevel" type="range" min="0.08" max="0.7" step="0.01"></label>
         <label class="field"><span>Mountain Line <output id="mountainLevelOut"></output></span><input id="mountainLevel" type="range" min="0.3" max="0.95" step="0.01"></label>
         <label class="field"><span>Seed <output id="seedOut"></output></span><input id="seed" type="range" min="0" max="255" step="1"></label>
+      </div>
+      <div class="toggle-grid">
+        <label class="toggle-field"><input id="playfulPalette" type="checkbox"><span>Playful Colors</span></label>
+        <label class="toggle-field"><input id="showClouds" type="checkbox"><span>Cloud Layer</span></label>
+        <label class="toggle-field"><input id="showRings" type="checkbox"><span>Saturn Rings</span></label>
+        <label class="toggle-field"><input id="showMoons" type="checkbox"><span>Moons</span></label>
+        <label class="toggle-field"><input id="showFish" type="checkbox"><span>Space Fish</span></label>
       </div>
 
       <section class="saves" aria-label="Saved generations">
