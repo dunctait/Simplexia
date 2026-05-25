@@ -34,3 +34,23 @@ test('loadAll tolerates malformed storage', () => {
   local.setItem(storage.STORAGE_KEY, '{bad json');
   assert.deepEqual(storage.loadAll(local), []);
 });
+
+test('session settings and view state round-trip', () => {
+  const local = memoryStorage();
+  storage.saveSession({
+    settings: { seed: 123, octaves: 6, biomePreset: 'arctic' },
+    view: 'globe',
+    showGrid: true
+  }, local);
+  assert.deepEqual(storage.loadSession(local), {
+    settings: { seed: 123, octaves: 6, biomePreset: 'arctic' },
+    view: 'globe',
+    showGrid: true
+  });
+});
+
+test('loadSession tolerates malformed storage', () => {
+  const local = memoryStorage();
+  local.setItem(storage.SESSION_KEY, '{bad json');
+  assert.equal(storage.loadSession(local), null);
+});

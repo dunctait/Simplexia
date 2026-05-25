@@ -37,19 +37,19 @@
       </label>
 
       <div class="control-grid">
-        <label class="field"><span>Columns <output id="columnsOut"></output></span><input id="columns" type="range" min="48" max="256" step="8"></label>
-        <label class="field"><span>Rows <output id="rowsOut"></output></span><input id="rows" type="range" min="48" max="256" step="8"></label>
+        <label class="field"><span>Columns <output id="columnsOut"></output></span><input id="columns" type="range" min="48" max="2048" step="16"></label>
+        <label class="field"><span>Rows <output id="rowsOut"></output></span><input id="rows" type="range" min="48" max="2048" step="16"></label>
         <label class="field"><span>Octaves <output id="octavesOut"></output></span><input id="octaves" type="range" min="1" max="8" step="1"></label>
         <label class="field"><span>Roughness <output id="roughnessOut"></output></span><input id="roughness" type="range" min="0.1" max="1" step="0.01"></label>
         <label class="field"><span>Scale <output id="scaleOut"></output></span><input id="scale" type="range" min="0.003" max="0.05" step="0.001"></label>
         <label class="field"><span>Sea Level <output id="seaLevelOut"></output></span><input id="seaLevel" type="range" min="0.05" max="0.55" step="0.01"></label>
         <label class="field"><span>Beach Line <output id="beachLevelOut"></output></span><input id="beachLevel" type="range" min="0.08" max="0.7" step="0.01"></label>
         <label class="field"><span>Mountain Line <output id="mountainLevelOut"></output></span><input id="mountainLevel" type="range" min="0.3" max="0.95" step="0.01"></label>
-        <label class="field"><span>Edge Fade <output id="edgeFadeOut"></output></span><input id="edgeFade" type="range" min="0" max="0.35" step="0.01"></label>
+        <label class="field grid-mask-control"><span>Grid Edge Fade <output id="edgeFadeOut"></output></span><input id="edgeFade" type="range" min="0" max="0.35" step="0.01"></label>
         <label class="field"><span>Seed <output id="seedOut"></output></span><input id="seed" type="range" min="0" max="255" step="1"></label>
       </div>
 
-      <label class="switch"><input id="radialEnabled" type="checkbox"> <span>Radial island mask</span></label>
+      <label class="switch grid-mask-control"><input id="radialEnabled" type="checkbox"> <span>Grid radial island mask</span></label>
       <label class="switch"><input id="showGrid" type="checkbox"> <span>Show tile grid</span></label>
 
       <section class="saves" aria-label="Saved generations">

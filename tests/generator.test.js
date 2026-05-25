@@ -14,14 +14,19 @@ test('generated values are normalized and match requested dimensions', () => {
   const result = generator.generate({ columns: 72, rows: 56, seed: 7 });
   assert.equal(result.values.length, 56);
   assert.equal(result.values[0].length, 72);
-  const flat = result.values.flat();
-  assert.ok(flat.every((value) => value >= 0 && value <= 1));
+  assert.ok(result.values.every((row) => Array.from(row).every((value) => value >= 0 && value <= 1)));
 });
 
 test('thresholds remain ordered when normalized', () => {
   const settings = generator.normalizeSettings({ seaLevel: 0.5, beachLevel: 0.2, mountainLevel: 0.25 });
   assert.ok(settings.seaLevel < settings.beachLevel);
   assert.ok(settings.beachLevel < settings.mountainLevel);
+});
+
+test('dimensions normalize up to 2048', () => {
+  const settings = generator.normalizeSettings({ columns: 5000, rows: 4096 });
+  assert.equal(settings.columns, 2048);
+  assert.equal(settings.rows, 2048);
 });
 
 test('export string contains serializable settings', () => {

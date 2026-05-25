@@ -9,6 +9,7 @@
 - Add brush tools for raise, lower, flatten, paint biome, and blend biome edges.
 - Add river/lake generation from downhill flow and rainfall.
 - Add globe controls for pause rotation, reset camera, wireframe, and exaggerated elevation.
+- Add globe-native equivalents for island masks, such as polar falloff, continental spread, and equatorial bias.
 - Add a phase 2 "run" mode where saved generations become simulation inputs for deployable life forms.
 
 ## Research Notes

@@ -4,11 +4,12 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   const generator = window.IslandGenerator;
   const storage = window.IslandStorage;
+  const restoredSession = storage.loadSession();
   const state = {
-    settings: generator.normalizeSettings(),
+    settings: generator.normalizeSettings(restoredSession ? restoredSession.settings : undefined),
     result: null,
-    view: 'grid',
-    showGrid: false
+    view: restoredSession ? restoredSession.view : 'grid',
+    showGrid: restoredSession ? restoredSession.showGrid : false
   };
 
   const ids = [
@@ -35,6 +36,8 @@
     });
     bindControls();
     syncControls();
+    syncViewToggle();
+    syncModeControls();
     regenerate();
     refreshSaves();
     window.simplexIslands = { state, regenerate };
@@ -54,6 +57,7 @@
     el.showGrid.addEventListener('change', () => {
       state.showGrid = el.showGrid.checked;
       render();
+      persistSession();
     });
     el.biomePreset.addEventListener('change', () => {
       state.settings.biomePreset = el.biomePreset.value;
@@ -62,8 +66,9 @@
     document.querySelectorAll('[data-view]').forEach((button) => {
       button.addEventListener('click', () => {
         state.view = button.dataset.view;
-        document.querySelectorAll('[data-view]').forEach((item) => item.classList.toggle('is-active', item === button));
-        render();
+        syncViewToggle();
+        syncModeControls();
+        regenerate();
       });
     });
     document.getElementById('randomize').addEventListener('click', () => {
@@ -73,7 +78,11 @@
     });
     document.getElementById('reset').addEventListener('click', () => {
       state.settings = generator.normalizeSettings();
+      state.view = 'grid';
+      state.showGrid = false;
       syncControls();
+      syncViewToggle();
+      syncModeControls();
       regenerate();
     });
     document.getElementById('copy-export').addEventListener('click', copyExport);
@@ -87,10 +96,12 @@
   }
 
   function regenerate() {
-    state.result = generator.generate(state.settings);
-    state.settings = state.result.settings;
+    state.settings = generator.normalizeSettings(state.settings);
+    state.result = generator.generate(effectiveGenerationSettings());
     syncControls();
+    syncModeControls();
     render();
+    persistSession();
   }
 
   function render() {
@@ -107,6 +118,36 @@
     el.radialEnabled.checked = state.settings.radialEnabled;
     el.showGrid.checked = state.showGrid;
     el.biomePreset.value = state.settings.biomePreset;
+  }
+
+  function syncViewToggle() {
+    document.querySelectorAll('[data-view]').forEach((item) => {
+      item.classList.toggle('is-active', item.dataset.view === state.view);
+    });
+  }
+
+  function syncModeControls() {
+    document.querySelectorAll('.grid-mask-control').forEach((item) => {
+      item.classList.toggle('is-muted', state.view === 'globe');
+      item.title = state.view === 'globe' ? 'Grid-only island mask control' : '';
+    });
+  }
+
+  function effectiveGenerationSettings() {
+    if (state.view !== 'globe') return state.settings;
+    return {
+      ...state.settings,
+      edgeFade: 0,
+      radialEnabled: false
+    };
+  }
+
+  function persistSession() {
+    storage.saveSession({
+      settings: state.settings,
+      view: state.view,
+      showGrid: state.showGrid
+    });
   }
 
   function updateSummary() {

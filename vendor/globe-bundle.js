@@ -26714,7 +26714,7 @@ void main() {
     const scene = new Scene();
     scene.background = new Color(725273);
     const camera = new PerspectiveCamera(42, 1, 0.1, 100);
-    camera.position.set(0, 0.18, 4.6);
+    camera.position.set(0, 0.18, 5.35);
     const renderer = new WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     container.replaceChildren(renderer.domElement);
@@ -26727,17 +26727,25 @@ void main() {
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
+    let velocityX = 0;
+    let velocityY = 0;
     const rotation = { x: -0.18, y: -0.45 };
     container.addEventListener("pointerdown", (event) => {
       dragging = true;
+      velocityX = 0;
+      velocityY = 0;
       lastX = event.clientX;
       lastY = event.clientY;
       container.setPointerCapture(event.pointerId);
     });
     container.addEventListener("pointermove", (event) => {
       if (!dragging || !mesh) return;
-      rotation.y += (event.clientX - lastX) * 8e-3;
-      rotation.x += (event.clientY - lastY) * 6e-3;
+      const dx = event.clientX - lastX;
+      const dy = event.clientY - lastY;
+      velocityY = dx * 0.018;
+      velocityX = dy * 0.014;
+      rotation.y += velocityY;
+      rotation.x += velocityX;
       rotation.x = Math.max(-1.1, Math.min(1.1, rotation.x));
       lastX = event.clientX;
       lastY = event.clientY;
@@ -26784,8 +26792,15 @@ void main() {
       renderer.render(scene, camera);
     }
     function animate() {
-      if (mesh && !dragging && !container.hidden) {
-        rotation.y += 3e-3;
+      if (mesh && !container.hidden) {
+        if (!dragging) {
+          rotation.x = Math.max(-1.1, Math.min(1.1, rotation.x + velocityX));
+          rotation.y += velocityY || 3e-3;
+          velocityX *= 0.94;
+          velocityY *= 0.94;
+          if (Math.abs(velocityX) < 4e-4) velocityX = 0;
+          if (Math.abs(velocityY) < 4e-4) velocityY = 0;
+        }
         draw();
       }
       requestAnimationFrame(animate);

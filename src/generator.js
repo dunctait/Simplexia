@@ -49,8 +49,8 @@
 
   function normalizeSettings(input = {}) {
     const settings = { ...DEFAULT_SETTINGS, ...input };
-    settings.columns = clampInt(settings.columns, 48, 256);
-    settings.rows = clampInt(settings.rows, 48, 256);
+    settings.columns = clampInt(settings.columns, 48, 2048);
+    settings.rows = clampInt(settings.rows, 48, 2048);
     settings.octaves = clampInt(settings.octaves, 1, 8);
     settings.roughness = clampNumber(settings.roughness, 0.1, 1);
     settings.scale = clampNumber(settings.scale, 0.003, 0.05);
@@ -67,7 +67,7 @@
   function generate(input) {
     const settings = normalizeSettings(input);
     const simplex = SimplexNoise.create(settings.seed);
-    const values = Array.from({ length: settings.rows }, () => new Array(settings.columns).fill(0));
+    const values = Array.from({ length: settings.rows }, () => new Float32Array(settings.columns));
     let frequency = settings.scale;
     let weight = 1;
 
