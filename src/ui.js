@@ -17,6 +17,8 @@
   let renderer = null;
   let activeWorker = null;
   let generationId = 0;
+  let generationTimer = null;
+  let pendingSettings = null;
 
   function init({ globeFactory } = {}) {
     renderer = window.IslandRenderer.createRenderer(
@@ -41,22 +43,34 @@
     controlIds.forEach((id) => {
       el[id].addEventListener('input', () => {
         state.settings[id] = Number(el[id].value);
-        regenerate();
+        syncControls();
+        persistSession();
+        scheduleGeneration();
+      });
+      el[id].addEventListener('change', () => {
+        state.settings[id] = Number(el[id].value);
+        syncControls();
+        persistSession();
+        regenerateNow();
       });
     });
     el.biomePreset.addEventListener('change', () => {
       state.settings.biomePreset = el.biomePreset.value;
-      regenerate();
+      syncControls();
+      persistSession();
+      regenerateNow();
     });
     document.getElementById('randomize').addEventListener('click', () => {
       state.settings.seed = Math.floor(Math.random() * 256);
       syncControls();
-      regenerate();
+      persistSession();
+      regenerateNow();
     });
     document.getElementById('reset').addEventListener('click', () => {
       state.settings = generator.normalizeSettings();
       syncControls();
-      regenerate();
+      persistSession();
+      regenerateNow();
     });
     document.getElementById('copy-export').addEventListener('click', copyExport);
     document.getElementById('save').addEventListener('click', saveCurrent);
@@ -69,16 +83,38 @@
   }
 
   function regenerate() {
+    regenerateNow();
+  }
+
+  function regenerateNow() {
     state.settings = generator.normalizeSettings(state.settings);
     syncControls();
     persistSession();
+    clearScheduledGeneration();
     startGeneration(state.settings);
+  }
+
+  function scheduleGeneration() {
+    pendingSettings = { ...state.settings };
+    clearScheduledGeneration();
+    generationTimer = setTimeout(() => {
+      generationTimer = null;
+      if (pendingSettings) startGeneration(generator.normalizeSettings(pendingSettings));
+    }, 140);
+  }
+
+  function clearScheduledGeneration() {
+    if (generationTimer) {
+      clearTimeout(generationTimer);
+      generationTimer = null;
+    }
   }
 
   function startGeneration(settings) {
     generationId += 1;
     const id = generationId;
     if (activeWorker) activeWorker.terminate();
+    pendingSettings = null;
     setLoading(true);
     if (!window.Worker) {
       setTimeout(() => finishGeneration(id, generator.generateGlobe(settings)), 0);

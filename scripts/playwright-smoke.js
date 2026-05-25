@@ -28,25 +28,29 @@ async function main() {
     input.value = '224';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.waitForFunction(() => document.querySelector('#globe-stage').dataset.resolution === '224');
-  const highResolutionVertexCount = await page.locator('#globe-stage').evaluate((stage) => Number(stage.dataset.vertexCount));
+  const overlayAfterFirstMove = await page.locator('#generation-loading').evaluate((el) => el.hidden);
+  if (!overlayAfterFirstMove) {
+    throw new Error('Loading overlay appeared during slider drag');
+  }
   await page.locator('#resolution').evaluate((input) => {
-    input.value = '80';
+    input.value = '96';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.waitForFunction((previous) => {
-    const stage = document.querySelector('#globe-stage');
-    return stage.dataset.resolution === '80' && Number(stage.dataset.vertexCount) !== previous;
-  }, highResolutionVertexCount);
-  const lowResolutionVertexCount = await page.locator('#globe-stage').evaluate((stage) => Number(stage.dataset.vertexCount));
-  if (!(highResolutionVertexCount > lowResolutionVertexCount)) {
-    throw new Error(`Resolution did not change mesh complexity: high=${highResolutionVertexCount}, low=${lowResolutionVertexCount}`);
+  const overlayAfterSecondMove = await page.locator('#generation-loading').evaluate((el) => el.hidden);
+  if (!overlayAfterSecondMove) {
+    throw new Error('Loading overlay appeared while the slider was still moving');
   }
+  await page.waitForFunction(() => document.querySelector('#globe-stage').dataset.resolution === '96');
+  const lowResolutionVertexCount = await page.locator('#globe-stage').evaluate((stage) => Number(stage.dataset.vertexCount));
   await page.locator('#resolution').evaluate((input) => {
     input.value = '224';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.waitForFunction(() => document.querySelector('#globe-stage').dataset.resolution === '224');
+  const highResolutionVertexCount = await page.locator('#globe-stage').evaluate((stage) => Number(stage.dataset.vertexCount));
+  if (!(highResolutionVertexCount > lowResolutionVertexCount)) {
+    throw new Error(`Resolution did not change mesh complexity: high=${highResolutionVertexCount}, low=${lowResolutionVertexCount}`);
+  }
   await page.locator('#biomePreset').selectOption('arctic');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.simplexIslands && window.simplexIslands.state.result);
