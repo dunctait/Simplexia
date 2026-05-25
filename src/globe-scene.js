@@ -25,7 +25,12 @@ export function createGlobeScene(container, generator) {
   let velocityY = 0;
   const rotation = { x: -0.18, y: -0.45 };
 
+  container.addEventListener('touchmove', (event) => {
+    event.preventDefault();
+  }, { passive: false });
+
   container.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
     dragging = true;
     velocityX = 0;
     velocityY = 0;
@@ -35,6 +40,7 @@ export function createGlobeScene(container, generator) {
   });
   container.addEventListener('pointermove', (event) => {
     if (!dragging || !mesh) return;
+    event.preventDefault();
     const dx = event.clientX - lastX;
     const dy = event.clientY - lastY;
     velocityY = dx * 0.018;
