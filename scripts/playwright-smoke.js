@@ -47,6 +47,18 @@ async function main() {
   if (lowResolutionValue !== '96' || lowResolutionOutput !== '96') {
     throw new Error(`Resolution snapped back after release: input=${lowResolutionValue}, output=${lowResolutionOutput}`);
   }
+  const resolutionSlider = page.locator('#resolution');
+  const sliderBox = await resolutionSlider.boundingBox();
+  await page.mouse.move(sliderBox.x + 4, sliderBox.y + sliderBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sliderBox.x + sliderBox.width - 2, sliderBox.y + sliderBox.height / 2, { steps: 24 });
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('#resolution').value === '384');
+  const draggedResolutionValue = await resolutionSlider.inputValue();
+  const draggedResolutionOutput = await page.locator('#resolutionOut').textContent();
+  if (draggedResolutionValue !== '384' || draggedResolutionOutput !== '384') {
+    throw new Error(`Resolution slider did not reach max on drag: input=${draggedResolutionValue}, output=${draggedResolutionOutput}`);
+  }
   await page.locator('#resolution').evaluate((input) => {
     input.value = '224';
     input.dispatchEvent(new Event('input', { bubbles: true }));

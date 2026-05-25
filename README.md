@@ -5,7 +5,7 @@ HTML5 procedural planet generator designed for GitHub Pages.
 ## Phase 1
 
 - Responsive Three.js/WebGL globe UI
-- Deterministic seed, resolution, continent scale, surface detail, roughness, sea level, and biome controls
+- Deterministic seed, resolution, landmass scale, surface detail, roughness, sea level, and biome controls
 - Worker-backed async generation with stale-run cancellation
 - Biome presets
 - Export current generation as JSON
