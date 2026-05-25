@@ -12099,6 +12099,228 @@ var IslandGlobeBundle = (() => {
       return new this.constructor().copy(this);
     }
   };
+  var LineBasicMaterial = class extends Material {
+    /**
+     * Constructs a new line basic material.
+     *
+     * @param {Object} [parameters] - An object with one or more properties
+     * defining the material's appearance. Any property of the material
+     * (including any property from inherited materials) can be passed
+     * in here. Color values can be passed any type of value accepted
+     * by {@link Color#set}.
+     */
+    constructor(parameters) {
+      super();
+      this.isLineBasicMaterial = true;
+      this.type = "LineBasicMaterial";
+      this.color = new Color(16777215);
+      this.map = null;
+      this.linewidth = 1;
+      this.linecap = "round";
+      this.linejoin = "round";
+      this.fog = true;
+      this.setValues(parameters);
+    }
+    copy(source) {
+      super.copy(source);
+      this.color.copy(source.color);
+      this.map = source.map;
+      this.linewidth = source.linewidth;
+      this.linecap = source.linecap;
+      this.linejoin = source.linejoin;
+      this.fog = source.fog;
+      return this;
+    }
+  };
+  var _vStart = /* @__PURE__ */ new Vector3();
+  var _vEnd = /* @__PURE__ */ new Vector3();
+  var _inverseMatrix$1 = /* @__PURE__ */ new Matrix4();
+  var _ray$1 = /* @__PURE__ */ new Ray();
+  var _sphere$1 = /* @__PURE__ */ new Sphere();
+  var _intersectPointOnRay = /* @__PURE__ */ new Vector3();
+  var _intersectPointOnSegment = /* @__PURE__ */ new Vector3();
+  var Line = class extends Object3D {
+    /**
+     * Constructs a new line.
+     *
+     * @param {BufferGeometry} [geometry] - The line geometry.
+     * @param {Material|Array<Material>} [material] - The line material.
+     */
+    constructor(geometry = new BufferGeometry(), material = new LineBasicMaterial()) {
+      super();
+      this.isLine = true;
+      this.type = "Line";
+      this.geometry = geometry;
+      this.material = material;
+      this.morphTargetDictionary = void 0;
+      this.morphTargetInfluences = void 0;
+      this.updateMorphTargets();
+    }
+    copy(source, recursive) {
+      super.copy(source, recursive);
+      this.material = Array.isArray(source.material) ? source.material.slice() : source.material;
+      this.geometry = source.geometry;
+      return this;
+    }
+    /**
+     * Computes an array of distance values which are necessary for rendering dashed lines.
+     * For each vertex in the geometry, the method calculates the cumulative length from the
+     * current point to the very beginning of the line.
+     *
+     * @return {Line} A reference to this line.
+     */
+    computeLineDistances() {
+      const geometry = this.geometry;
+      if (geometry.index === null) {
+        const positionAttribute = geometry.attributes.position;
+        const lineDistances = [0];
+        for (let i = 1, l = positionAttribute.count; i < l; i++) {
+          _vStart.fromBufferAttribute(positionAttribute, i - 1);
+          _vEnd.fromBufferAttribute(positionAttribute, i);
+          lineDistances[i] = lineDistances[i - 1];
+          lineDistances[i] += _vStart.distanceTo(_vEnd);
+        }
+        geometry.setAttribute("lineDistance", new Float32BufferAttribute(lineDistances, 1));
+      } else {
+        warn("Line.computeLineDistances(): Computation only possible with non-indexed BufferGeometry.");
+      }
+      return this;
+    }
+    /**
+     * Computes intersection points between a casted ray and this line.
+     *
+     * @param {Raycaster} raycaster - The raycaster.
+     * @param {Array<Object>} intersects - The target array that holds the intersection points.
+     */
+    raycast(raycaster, intersects) {
+      const geometry = this.geometry;
+      const matrixWorld = this.matrixWorld;
+      const threshold = raycaster.params.Line.threshold;
+      const drawRange = geometry.drawRange;
+      if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
+      _sphere$1.copy(geometry.boundingSphere);
+      _sphere$1.applyMatrix4(matrixWorld);
+      _sphere$1.radius += threshold;
+      if (raycaster.ray.intersectsSphere(_sphere$1) === false) return;
+      _inverseMatrix$1.copy(matrixWorld).invert();
+      _ray$1.copy(raycaster.ray).applyMatrix4(_inverseMatrix$1);
+      const localThreshold = threshold / ((this.scale.x + this.scale.y + this.scale.z) / 3);
+      const localThresholdSq = localThreshold * localThreshold;
+      const step = this.isLineSegments ? 2 : 1;
+      const index = geometry.index;
+      const attributes = geometry.attributes;
+      const positionAttribute = attributes.position;
+      if (index !== null) {
+        const start = Math.max(0, drawRange.start);
+        const end = Math.min(index.count, drawRange.start + drawRange.count);
+        for (let i = start, l = end - 1; i < l; i += step) {
+          const a = index.getX(i);
+          const b = index.getX(i + 1);
+          const intersect = checkIntersection(this, raycaster, _ray$1, localThresholdSq, a, b, i);
+          if (intersect) {
+            intersects.push(intersect);
+          }
+        }
+        if (this.isLineLoop) {
+          const a = index.getX(end - 1);
+          const b = index.getX(start);
+          const intersect = checkIntersection(this, raycaster, _ray$1, localThresholdSq, a, b, end - 1);
+          if (intersect) {
+            intersects.push(intersect);
+          }
+        }
+      } else {
+        const start = Math.max(0, drawRange.start);
+        const end = Math.min(positionAttribute.count, drawRange.start + drawRange.count);
+        for (let i = start, l = end - 1; i < l; i += step) {
+          const intersect = checkIntersection(this, raycaster, _ray$1, localThresholdSq, i, i + 1, i);
+          if (intersect) {
+            intersects.push(intersect);
+          }
+        }
+        if (this.isLineLoop) {
+          const intersect = checkIntersection(this, raycaster, _ray$1, localThresholdSq, end - 1, start, end - 1);
+          if (intersect) {
+            intersects.push(intersect);
+          }
+        }
+      }
+    }
+    /**
+     * Sets the values of {@link Line#morphTargetDictionary} and {@link Line#morphTargetInfluences}
+     * to make sure existing morph targets can influence this 3D object.
+     */
+    updateMorphTargets() {
+      const geometry = this.geometry;
+      const morphAttributes = geometry.morphAttributes;
+      const keys = Object.keys(morphAttributes);
+      if (keys.length > 0) {
+        const morphAttribute = morphAttributes[keys[0]];
+        if (morphAttribute !== void 0) {
+          this.morphTargetInfluences = [];
+          this.morphTargetDictionary = {};
+          for (let m = 0, ml = morphAttribute.length; m < ml; m++) {
+            const name = morphAttribute[m].name || String(m);
+            this.morphTargetInfluences.push(0);
+            this.morphTargetDictionary[name] = m;
+          }
+        }
+      }
+    }
+  };
+  function checkIntersection(object, raycaster, ray, thresholdSq, a, b, i) {
+    const positionAttribute = object.geometry.attributes.position;
+    _vStart.fromBufferAttribute(positionAttribute, a);
+    _vEnd.fromBufferAttribute(positionAttribute, b);
+    const distSq = ray.distanceSqToSegment(_vStart, _vEnd, _intersectPointOnRay, _intersectPointOnSegment);
+    if (distSq > thresholdSq) return;
+    _intersectPointOnRay.applyMatrix4(object.matrixWorld);
+    const distance = raycaster.ray.origin.distanceTo(_intersectPointOnRay);
+    if (distance < raycaster.near || distance > raycaster.far) return;
+    return {
+      distance,
+      // What do we want? intersection point on the ray or on the segment??
+      // point: raycaster.ray.at( distance ),
+      point: _intersectPointOnSegment.clone().applyMatrix4(object.matrixWorld),
+      index: i,
+      face: null,
+      faceIndex: null,
+      barycoord: null,
+      object
+    };
+  }
+  var _start = /* @__PURE__ */ new Vector3();
+  var _end = /* @__PURE__ */ new Vector3();
+  var LineSegments = class extends Line {
+    /**
+     * Constructs a new line segments.
+     *
+     * @param {BufferGeometry} [geometry] - The line geometry.
+     * @param {Material|Array<Material>} [material] - The line material.
+     */
+    constructor(geometry, material) {
+      super(geometry, material);
+      this.isLineSegments = true;
+      this.type = "LineSegments";
+    }
+    computeLineDistances() {
+      const geometry = this.geometry;
+      if (geometry.index === null) {
+        const positionAttribute = geometry.attributes.position;
+        const lineDistances = [];
+        for (let i = 0, l = positionAttribute.count; i < l; i += 2) {
+          _start.fromBufferAttribute(positionAttribute, i);
+          _end.fromBufferAttribute(positionAttribute, i + 1);
+          lineDistances[i] = i === 0 ? 0 : lineDistances[i - 1];
+          lineDistances[i + 1] = lineDistances[i] + _start.distanceTo(_end);
+        }
+        geometry.setAttribute("lineDistance", new Float32BufferAttribute(lineDistances, 1));
+      } else {
+        warn("LineSegments.computeLineDistances(): Computation only possible with non-indexed BufferGeometry.");
+      }
+      return this;
+    }
+  };
   var PointsMaterial = class extends Material {
     /**
      * Constructs a new points material.
@@ -13210,6 +13432,93 @@ var IslandGlobeBundle = (() => {
       return this;
     }
   };
+  var MeshPhongMaterial = class extends Material {
+    /**
+     * Constructs a new mesh phong material.
+     *
+     * @param {Object} [parameters] - An object with one or more properties
+     * defining the material's appearance. Any property of the material
+     * (including any property from inherited materials) can be passed
+     * in here. Color values can be passed any type of value accepted
+     * by {@link Color#set}.
+     */
+    constructor(parameters) {
+      super();
+      this.isMeshPhongMaterial = true;
+      this.type = "MeshPhongMaterial";
+      this.color = new Color(16777215);
+      this.specular = new Color(1118481);
+      this.shininess = 30;
+      this.map = null;
+      this.lightMap = null;
+      this.lightMapIntensity = 1;
+      this.aoMap = null;
+      this.aoMapIntensity = 1;
+      this.emissive = new Color(0);
+      this.emissiveIntensity = 1;
+      this.emissiveMap = null;
+      this.bumpMap = null;
+      this.bumpScale = 1;
+      this.normalMap = null;
+      this.normalMapType = TangentSpaceNormalMap;
+      this.normalScale = new Vector2(1, 1);
+      this.displacementMap = null;
+      this.displacementScale = 1;
+      this.displacementBias = 0;
+      this.specularMap = null;
+      this.alphaMap = null;
+      this.envMap = null;
+      this.envMapRotation = new Euler();
+      this.combine = MultiplyOperation;
+      this.reflectivity = 1;
+      this.envMapIntensity = 1;
+      this.refractionRatio = 0.98;
+      this.wireframe = false;
+      this.wireframeLinewidth = 1;
+      this.wireframeLinecap = "round";
+      this.wireframeLinejoin = "round";
+      this.flatShading = false;
+      this.fog = true;
+      this.setValues(parameters);
+    }
+    copy(source) {
+      super.copy(source);
+      this.color.copy(source.color);
+      this.specular.copy(source.specular);
+      this.shininess = source.shininess;
+      this.map = source.map;
+      this.lightMap = source.lightMap;
+      this.lightMapIntensity = source.lightMapIntensity;
+      this.aoMap = source.aoMap;
+      this.aoMapIntensity = source.aoMapIntensity;
+      this.emissive.copy(source.emissive);
+      this.emissiveMap = source.emissiveMap;
+      this.emissiveIntensity = source.emissiveIntensity;
+      this.bumpMap = source.bumpMap;
+      this.bumpScale = source.bumpScale;
+      this.normalMap = source.normalMap;
+      this.normalMapType = source.normalMapType;
+      this.normalScale.copy(source.normalScale);
+      this.displacementMap = source.displacementMap;
+      this.displacementScale = source.displacementScale;
+      this.displacementBias = source.displacementBias;
+      this.specularMap = source.specularMap;
+      this.alphaMap = source.alphaMap;
+      this.envMap = source.envMap;
+      this.envMapRotation.copy(source.envMapRotation);
+      this.combine = source.combine;
+      this.reflectivity = source.reflectivity;
+      this.envMapIntensity = source.envMapIntensity;
+      this.refractionRatio = source.refractionRatio;
+      this.wireframe = source.wireframe;
+      this.wireframeLinewidth = source.wireframeLinewidth;
+      this.wireframeLinecap = source.wireframeLinecap;
+      this.wireframeLinejoin = source.wireframeLinejoin;
+      this.flatShading = source.flatShading;
+      this.fog = source.fog;
+      return this;
+    }
+  };
   var MeshDepthMaterial = class extends Material {
     /**
      * Constructs a new mesh depth material.
@@ -14046,6 +14355,74 @@ var IslandGlobeBundle = (() => {
     }
   };
   VectorKeyframeTrack.prototype.ValueTypeName = "vector";
+  var Cache = {
+    /**
+     * Whether caching is enabled or not.
+     *
+     * @static
+     * @type {boolean}
+     * @default false
+     */
+    enabled: false,
+    /**
+     * A dictionary that holds cached files.
+     *
+     * @static
+     * @type {Object<string,Object>}
+     */
+    files: {},
+    /**
+     * Adds a cache entry with a key to reference the file. If this key already
+     * holds a file, it is overwritten.
+     *
+     * @static
+     * @param {string} key - The key to reference the cached file.
+     * @param {Object} file -  The file to be cached.
+     */
+    add: function(key, file) {
+      if (this.enabled === false) return;
+      if (isBlobURL(key)) return;
+      this.files[key] = file;
+    },
+    /**
+     * Gets the cached value for the given key.
+     *
+     * @static
+     * @param {string} key - The key to reference the cached file.
+     * @return {Object|undefined} The cached file. If the key does not exist `undefined` is returned.
+     */
+    get: function(key) {
+      if (this.enabled === false) return;
+      if (isBlobURL(key)) return;
+      return this.files[key];
+    },
+    /**
+     * Removes the cached file associated with the given key.
+     *
+     * @static
+     * @param {string} key - The key to reference the cached file.
+     */
+    remove: function(key) {
+      delete this.files[key];
+    },
+    /**
+     * Remove all values from the cache.
+     *
+     * @static
+     */
+    clear: function() {
+      this.files = {};
+    }
+  };
+  function isBlobURL(key) {
+    try {
+      const urlString = key.slice(key.indexOf(":") + 1);
+      const url = new URL(urlString);
+      return url.protocol === "blob:";
+    } catch (e) {
+      return false;
+    }
+  }
   var LoadingManager = class {
     /**
      * Constructs a new loading manager.
@@ -14262,6 +14639,188 @@ var IslandGlobeBundle = (() => {
     }
   };
   Loader.DEFAULT_MATERIAL_NAME = "__DEFAULT";
+  var loading = {};
+  var HttpError = class extends Error {
+    constructor(message, response) {
+      super(message);
+      this.response = response;
+    }
+  };
+  var FileLoader = class extends Loader {
+    /**
+     * Constructs a new file loader.
+     *
+     * @param {LoadingManager} [manager] - The loading manager.
+     */
+    constructor(manager) {
+      super(manager);
+      this.mimeType = "";
+      this.responseType = "";
+      this._abortController = new AbortController();
+    }
+    /**
+     * Starts loading from the given URL and pass the loaded response to the `onLoad()` callback.
+     *
+     * @param {string} url - The path/URL of the file to be loaded. This can also be a data URI.
+     * @param {function(any)} onLoad - Executed when the loading process has been finished.
+     * @param {onProgressCallback} [onProgress] - Executed while the loading is in progress.
+     * @param {onErrorCallback} [onError] - Executed when errors occur.
+     */
+    load(url, onLoad, onProgress, onError) {
+      if (url === void 0) url = "";
+      if (this.path !== void 0) url = this.path + url;
+      url = this.manager.resolveURL(url);
+      const cached = Cache.get(`file:${url}`);
+      if (cached !== void 0) {
+        this.manager.itemStart(url);
+        setTimeout(() => {
+          if (onLoad) onLoad(cached);
+          this.manager.itemEnd(url);
+        }, 0);
+        return;
+      }
+      if (loading[url] !== void 0) {
+        loading[url].push({
+          onLoad,
+          onProgress,
+          onError
+        });
+        return;
+      }
+      loading[url] = [];
+      loading[url].push({
+        onLoad,
+        onProgress,
+        onError
+      });
+      const req = new Request(url, {
+        headers: new Headers(this.requestHeader),
+        credentials: this.withCredentials ? "include" : "same-origin",
+        signal: typeof AbortSignal.any === "function" ? AbortSignal.any([this._abortController.signal, this.manager.abortController.signal]) : this._abortController.signal
+      });
+      const mimeType = this.mimeType;
+      const responseType = this.responseType;
+      fetch(req).then((response) => {
+        if (response.status === 200 || response.status === 0) {
+          if (response.status === 0) {
+            warn("FileLoader: HTTP Status 0 received.");
+          }
+          if (typeof ReadableStream === "undefined" || response.body === void 0 || response.body.getReader === void 0) {
+            return response;
+          }
+          const callbacks = loading[url];
+          const reader = response.body.getReader();
+          const contentLength = response.headers.get("X-File-Size") || response.headers.get("Content-Length");
+          const total = contentLength ? parseInt(contentLength) : 0;
+          const lengthComputable = total !== 0;
+          let loaded = 0;
+          const stream = new ReadableStream({
+            start(controller) {
+              readData();
+              function readData() {
+                reader.read().then(({ done, value }) => {
+                  if (done) {
+                    controller.close();
+                  } else {
+                    loaded += value.byteLength;
+                    const event = new ProgressEvent("progress", { lengthComputable, loaded, total });
+                    for (let i = 0, il = callbacks.length; i < il; i++) {
+                      const callback = callbacks[i];
+                      if (callback.onProgress) callback.onProgress(event);
+                    }
+                    controller.enqueue(value);
+                    readData();
+                  }
+                }, (e) => {
+                  controller.error(e);
+                });
+              }
+            }
+          });
+          return new Response(stream);
+        } else {
+          throw new HttpError(`fetch for "${response.url}" responded with ${response.status}: ${response.statusText}`, response);
+        }
+      }).then((response) => {
+        switch (responseType) {
+          case "arraybuffer":
+            return response.arrayBuffer();
+          case "blob":
+            return response.blob();
+          case "document":
+            return response.text().then((text) => {
+              const parser = new DOMParser();
+              return parser.parseFromString(text, mimeType);
+            });
+          case "json":
+            return response.json();
+          default:
+            if (mimeType === "") {
+              return response.text();
+            } else {
+              const re = /charset="?([^;"\s]*)"?/i;
+              const exec = re.exec(mimeType);
+              const label = exec && exec[1] ? exec[1].toLowerCase() : void 0;
+              const decoder = new TextDecoder(label);
+              return response.arrayBuffer().then((ab) => decoder.decode(ab));
+            }
+        }
+      }).then((data) => {
+        Cache.add(`file:${url}`, data);
+        const callbacks = loading[url];
+        delete loading[url];
+        for (let i = 0, il = callbacks.length; i < il; i++) {
+          const callback = callbacks[i];
+          if (callback.onLoad) callback.onLoad(data);
+        }
+      }).catch((err) => {
+        const callbacks = loading[url];
+        if (callbacks === void 0) {
+          this.manager.itemError(url);
+          throw err;
+        }
+        delete loading[url];
+        for (let i = 0, il = callbacks.length; i < il; i++) {
+          const callback = callbacks[i];
+          if (callback.onError) callback.onError(err);
+        }
+        this.manager.itemError(url);
+      }).finally(() => {
+        this.manager.itemEnd(url);
+      });
+      this.manager.itemStart(url);
+    }
+    /**
+     * Sets the expected response type.
+     *
+     * @param {('arraybuffer'|'blob'|'document'|'json'|'')} value - The response type.
+     * @return {FileLoader} A reference to this file loader.
+     */
+    setResponseType(value) {
+      this.responseType = value;
+      return this;
+    }
+    /**
+     * Sets the expected mime type of the loaded file.
+     *
+     * @param {string} value - The mime type.
+     * @return {FileLoader} A reference to this file loader.
+     */
+    setMimeType(value) {
+      this.mimeType = value;
+      return this;
+    }
+    /**
+     * Aborts ongoing fetch requests.
+     *
+     * @return {FileLoader} A reference to this instance.
+     */
+    abort() {
+      this._abortController.abort();
+      this._abortController = new AbortController();
+      return this;
+    }
+  };
   var Light = class extends Object3D {
     /**
      * Constructs a new light.
@@ -27143,7 +27702,528 @@ void main() {
     }
   };
 
+  // node_modules/three/examples/jsm/loaders/OBJLoader.js
+  var _object_pattern = /^[og]\s*(.+)?/;
+  var _material_library_pattern = /^mtllib /;
+  var _material_use_pattern = /^usemtl /;
+  var _map_use_pattern = /^usemap /;
+  var _face_vertex_data_separator_pattern = /\s+/;
+  var _vA2 = new Vector3();
+  var _vB2 = new Vector3();
+  var _vC2 = new Vector3();
+  var _ab = new Vector3();
+  var _cb = new Vector3();
+  var _color2 = new Color();
+  function ParserState() {
+    const state = {
+      objects: [],
+      object: {},
+      vertices: [],
+      normals: [],
+      colors: [],
+      uvs: [],
+      materials: {},
+      materialLibraries: [],
+      startObject: function(name, fromDeclaration) {
+        if (this.object && this.object.fromDeclaration === false) {
+          this.object.name = name;
+          this.object.fromDeclaration = fromDeclaration !== false;
+          return;
+        }
+        const previousMaterial = this.object && typeof this.object.currentMaterial === "function" ? this.object.currentMaterial() : void 0;
+        if (this.object && typeof this.object._finalize === "function") {
+          this.object._finalize(true);
+        }
+        this.object = {
+          name: name || "",
+          fromDeclaration: fromDeclaration !== false,
+          geometry: {
+            vertices: [],
+            normals: [],
+            colors: [],
+            uvs: [],
+            hasUVIndices: false
+          },
+          materials: [],
+          smooth: true,
+          startMaterial: function(name2, libraries) {
+            const previous = this._finalize(false);
+            if (previous && (previous.inherited || previous.groupCount <= 0)) {
+              this.materials.splice(previous.index, 1);
+            }
+            const material = {
+              index: this.materials.length,
+              name: name2 || "",
+              mtllib: Array.isArray(libraries) && libraries.length > 0 ? libraries[libraries.length - 1] : "",
+              smooth: previous !== void 0 ? previous.smooth : this.smooth,
+              groupStart: previous !== void 0 ? previous.groupEnd : 0,
+              groupEnd: -1,
+              groupCount: -1,
+              inherited: false,
+              clone: function(index) {
+                const cloned = {
+                  index: typeof index === "number" ? index : this.index,
+                  name: this.name,
+                  mtllib: this.mtllib,
+                  smooth: this.smooth,
+                  groupStart: 0,
+                  groupEnd: -1,
+                  groupCount: -1,
+                  inherited: false
+                };
+                cloned.clone = this.clone.bind(cloned);
+                return cloned;
+              }
+            };
+            this.materials.push(material);
+            return material;
+          },
+          currentMaterial: function() {
+            if (this.materials.length > 0) {
+              return this.materials[this.materials.length - 1];
+            }
+            return void 0;
+          },
+          _finalize: function(end) {
+            const lastMultiMaterial = this.currentMaterial();
+            if (lastMultiMaterial && lastMultiMaterial.groupEnd === -1) {
+              lastMultiMaterial.groupEnd = this.geometry.vertices.length / 3;
+              lastMultiMaterial.groupCount = lastMultiMaterial.groupEnd - lastMultiMaterial.groupStart;
+              lastMultiMaterial.inherited = false;
+            }
+            if (end && this.materials.length > 1) {
+              for (let mi = this.materials.length - 1; mi >= 0; mi--) {
+                if (this.materials[mi].groupCount <= 0) {
+                  this.materials.splice(mi, 1);
+                }
+              }
+            }
+            if (end && this.materials.length === 0) {
+              this.materials.push({
+                name: "",
+                smooth: this.smooth
+              });
+            }
+            return lastMultiMaterial;
+          }
+        };
+        if (previousMaterial && previousMaterial.name && typeof previousMaterial.clone === "function") {
+          const declared = previousMaterial.clone(0);
+          declared.inherited = true;
+          this.object.materials.push(declared);
+        }
+        this.objects.push(this.object);
+      },
+      finalize: function() {
+        if (this.object && typeof this.object._finalize === "function") {
+          this.object._finalize(true);
+        }
+      },
+      parseVertexIndex: function(value, len) {
+        const index = parseInt(value, 10);
+        return (index >= 0 ? index - 1 : index + len / 3) * 3;
+      },
+      parseNormalIndex: function(value, len) {
+        const index = parseInt(value, 10);
+        return (index >= 0 ? index - 1 : index + len / 3) * 3;
+      },
+      parseUVIndex: function(value, len) {
+        const index = parseInt(value, 10);
+        return (index >= 0 ? index - 1 : index + len / 2) * 2;
+      },
+      addVertex: function(a, b, c) {
+        const src = this.vertices;
+        const dst = this.object.geometry.vertices;
+        dst.push(src[a + 0], src[a + 1], src[a + 2]);
+        dst.push(src[b + 0], src[b + 1], src[b + 2]);
+        dst.push(src[c + 0], src[c + 1], src[c + 2]);
+      },
+      addVertexPoint: function(a) {
+        const src = this.vertices;
+        const dst = this.object.geometry.vertices;
+        dst.push(src[a + 0], src[a + 1], src[a + 2]);
+      },
+      addVertexLine: function(a) {
+        const src = this.vertices;
+        const dst = this.object.geometry.vertices;
+        dst.push(src[a + 0], src[a + 1], src[a + 2]);
+      },
+      addNormal: function(a, b, c) {
+        const src = this.normals;
+        const dst = this.object.geometry.normals;
+        dst.push(src[a + 0], src[a + 1], src[a + 2]);
+        dst.push(src[b + 0], src[b + 1], src[b + 2]);
+        dst.push(src[c + 0], src[c + 1], src[c + 2]);
+      },
+      addFaceNormal: function(a, b, c) {
+        const src = this.vertices;
+        const dst = this.object.geometry.normals;
+        _vA2.fromArray(src, a);
+        _vB2.fromArray(src, b);
+        _vC2.fromArray(src, c);
+        _cb.subVectors(_vC2, _vB2);
+        _ab.subVectors(_vA2, _vB2);
+        _cb.cross(_ab);
+        _cb.normalize();
+        dst.push(_cb.x, _cb.y, _cb.z);
+        dst.push(_cb.x, _cb.y, _cb.z);
+        dst.push(_cb.x, _cb.y, _cb.z);
+      },
+      addColor: function(a, b, c) {
+        const src = this.colors;
+        const dst = this.object.geometry.colors;
+        if (src[a] !== void 0) dst.push(src[a + 0], src[a + 1], src[a + 2]);
+        if (src[b] !== void 0) dst.push(src[b + 0], src[b + 1], src[b + 2]);
+        if (src[c] !== void 0) dst.push(src[c + 0], src[c + 1], src[c + 2]);
+      },
+      addUV: function(a, b, c) {
+        const src = this.uvs;
+        const dst = this.object.geometry.uvs;
+        dst.push(src[a + 0], src[a + 1]);
+        dst.push(src[b + 0], src[b + 1]);
+        dst.push(src[c + 0], src[c + 1]);
+      },
+      addDefaultUV: function() {
+        const dst = this.object.geometry.uvs;
+        dst.push(0, 0);
+        dst.push(0, 0);
+        dst.push(0, 0);
+      },
+      addUVLine: function(a) {
+        const src = this.uvs;
+        const dst = this.object.geometry.uvs;
+        dst.push(src[a + 0], src[a + 1]);
+      },
+      addFace: function(a, b, c, ua, ub, uc, na, nb, nc) {
+        const vLen = this.vertices.length;
+        let ia = this.parseVertexIndex(a, vLen);
+        let ib = this.parseVertexIndex(b, vLen);
+        let ic = this.parseVertexIndex(c, vLen);
+        this.addVertex(ia, ib, ic);
+        this.addColor(ia, ib, ic);
+        if (na !== void 0 && na !== "") {
+          const nLen = this.normals.length;
+          ia = this.parseNormalIndex(na, nLen);
+          ib = this.parseNormalIndex(nb, nLen);
+          ic = this.parseNormalIndex(nc, nLen);
+          this.addNormal(ia, ib, ic);
+        } else {
+          this.addFaceNormal(ia, ib, ic);
+        }
+        if (ua !== void 0 && ua !== "") {
+          const uvLen = this.uvs.length;
+          ia = this.parseUVIndex(ua, uvLen);
+          ib = this.parseUVIndex(ub, uvLen);
+          ic = this.parseUVIndex(uc, uvLen);
+          this.addUV(ia, ib, ic);
+          this.object.geometry.hasUVIndices = true;
+        } else {
+          this.addDefaultUV();
+        }
+      },
+      addPointGeometry: function(vertices) {
+        this.object.geometry.type = "Points";
+        const vLen = this.vertices.length;
+        for (let vi = 0, l = vertices.length; vi < l; vi++) {
+          const index = this.parseVertexIndex(vertices[vi], vLen);
+          this.addVertexPoint(index);
+          this.addColor(index);
+        }
+      },
+      addLineGeometry: function(vertices, uvs) {
+        this.object.geometry.type = "Line";
+        const vLen = this.vertices.length;
+        const uvLen = this.uvs.length;
+        for (let vi = 0, l = vertices.length; vi < l; vi++) {
+          this.addVertexLine(this.parseVertexIndex(vertices[vi], vLen));
+        }
+        for (let uvi = 0, l = uvs.length; uvi < l; uvi++) {
+          this.addUVLine(this.parseUVIndex(uvs[uvi], uvLen));
+        }
+      }
+    };
+    state.startObject("", false);
+    return state;
+  }
+  var OBJLoader = class extends Loader {
+    /**
+     * Constructs a new OBJ loader.
+     *
+     * @param {LoadingManager} [manager] - The loading manager.
+     */
+    constructor(manager) {
+      super(manager);
+      this.materials = null;
+    }
+    /**
+     * Starts loading from the given URL and passes the loaded OBJ asset
+     * to the `onLoad()` callback.
+     *
+     * @param {string} url - The path/URL of the file to be loaded. This can also be a data URI.
+     * @param {function(Group)} onLoad - Executed when the loading process has been finished.
+     * @param {onProgressCallback} onProgress - Executed while the loading is in progress.
+     * @param {onErrorCallback} onError - Executed when errors occur.
+     */
+    load(url, onLoad, onProgress, onError) {
+      const scope = this;
+      const loader = new FileLoader(this.manager);
+      loader.setPath(this.path);
+      loader.setRequestHeader(this.requestHeader);
+      loader.setWithCredentials(this.withCredentials);
+      loader.load(url, function(text) {
+        try {
+          onLoad(scope.parse(text));
+        } catch (e) {
+          if (onError) {
+            onError(e);
+          } else {
+            console.error(e);
+          }
+          scope.manager.itemError(url);
+        }
+      }, onProgress, onError);
+    }
+    /**
+     * Sets the material creator for this OBJ. This object is loaded via {@link MTLLoader}.
+     *
+     * @param {MaterialCreator} materials - An object that creates the materials for this OBJ.
+     * @return {OBJLoader} A reference to this loader.
+     */
+    setMaterials(materials) {
+      this.materials = materials;
+      return this;
+    }
+    /**
+     * Parses the given OBJ data and returns the resulting group.
+     *
+     * @param {string} text - The raw OBJ data as a string.
+     * @return {Group} The parsed OBJ.
+     */
+    parse(text) {
+      const state = new ParserState();
+      if (text.indexOf("\r\n") !== -1) {
+        text = text.replace(/\r\n/g, "\n");
+      }
+      if (text.indexOf("\\\n") !== -1) {
+        text = text.replace(/\\\n/g, "");
+      }
+      const lines = text.split("\n");
+      let result = [];
+      for (let i = 0, l = lines.length; i < l; i++) {
+        const line = lines[i].trimStart();
+        if (line.length === 0) continue;
+        const lineFirstChar = line.charAt(0);
+        if (lineFirstChar === "#") continue;
+        if (lineFirstChar === "v") {
+          const data = line.split(_face_vertex_data_separator_pattern);
+          switch (data[0]) {
+            case "v":
+              state.vertices.push(
+                parseFloat(data[1]),
+                parseFloat(data[2]),
+                parseFloat(data[3])
+              );
+              if (data.length >= 7) {
+                _color2.setRGB(
+                  parseFloat(data[4]),
+                  parseFloat(data[5]),
+                  parseFloat(data[6]),
+                  SRGBColorSpace
+                );
+                state.colors.push(_color2.r, _color2.g, _color2.b);
+              } else {
+                state.colors.push(void 0, void 0, void 0);
+              }
+              break;
+            case "vn":
+              state.normals.push(
+                parseFloat(data[1]),
+                parseFloat(data[2]),
+                parseFloat(data[3])
+              );
+              break;
+            case "vt":
+              state.uvs.push(
+                parseFloat(data[1]),
+                parseFloat(data[2])
+              );
+              break;
+          }
+        } else if (lineFirstChar === "f") {
+          const lineData = line.slice(1).trim();
+          const vertexData = lineData.split(_face_vertex_data_separator_pattern);
+          const faceVertices = [];
+          for (let j = 0, jl = vertexData.length; j < jl; j++) {
+            const vertex2 = vertexData[j];
+            if (vertex2.length > 0) {
+              const vertexParts = vertex2.split("/");
+              faceVertices.push(vertexParts);
+            }
+          }
+          const v1 = faceVertices[0];
+          for (let j = 1, jl = faceVertices.length - 1; j < jl; j++) {
+            const v2 = faceVertices[j];
+            const v3 = faceVertices[j + 1];
+            state.addFace(
+              v1[0],
+              v2[0],
+              v3[0],
+              v1[1],
+              v2[1],
+              v3[1],
+              v1[2],
+              v2[2],
+              v3[2]
+            );
+          }
+        } else if (lineFirstChar === "l") {
+          const lineParts = line.substring(1).trim().split(" ");
+          let lineVertices = [];
+          const lineUVs = [];
+          if (line.indexOf("/") === -1) {
+            lineVertices = lineParts;
+          } else {
+            for (let li = 0, llen = lineParts.length; li < llen; li++) {
+              const parts = lineParts[li].split("/");
+              if (parts[0] !== "") lineVertices.push(parts[0]);
+              if (parts[1] !== "") lineUVs.push(parts[1]);
+            }
+          }
+          state.addLineGeometry(lineVertices, lineUVs);
+        } else if (lineFirstChar === "p") {
+          const lineData = line.slice(1).trim();
+          const pointData = lineData.split(" ");
+          state.addPointGeometry(pointData);
+        } else if ((result = _object_pattern.exec(line)) !== null) {
+          const name = (" " + result[0].slice(1).trim()).slice(1);
+          state.startObject(name);
+        } else if (_material_use_pattern.test(line)) {
+          state.object.startMaterial(line.substring(7).trim(), state.materialLibraries);
+        } else if (_material_library_pattern.test(line)) {
+          state.materialLibraries.push(line.substring(7).trim());
+        } else if (_map_use_pattern.test(line)) {
+          console.warn('THREE.OBJLoader: Rendering identifier "usemap" not supported. Textures must be defined in MTL files.');
+        } else if (lineFirstChar === "s") {
+          result = line.split(" ");
+          if (result.length > 1) {
+            const value = result[1].trim().toLowerCase();
+            state.object.smooth = value !== "0" && value !== "off";
+          } else {
+            state.object.smooth = true;
+          }
+          const material = state.object.currentMaterial();
+          if (material) material.smooth = state.object.smooth;
+        } else {
+          if (line === "\0") continue;
+          console.warn('THREE.OBJLoader: Unexpected line: "' + line + '"');
+        }
+      }
+      state.finalize();
+      const container = new Group();
+      container.materialLibraries = [].concat(state.materialLibraries);
+      const hasPrimitives = !(state.objects.length === 1 && state.objects[0].geometry.vertices.length === 0);
+      if (hasPrimitives === true) {
+        for (let i = 0, l = state.objects.length; i < l; i++) {
+          const object = state.objects[i];
+          const geometry = object.geometry;
+          const materials = object.materials;
+          const isLine = geometry.type === "Line";
+          const isPoints = geometry.type === "Points";
+          let hasVertexColors = false;
+          if (geometry.vertices.length === 0) continue;
+          const buffergeometry = new BufferGeometry();
+          buffergeometry.setAttribute("position", new Float32BufferAttribute(geometry.vertices, 3));
+          if (geometry.normals.length > 0) {
+            buffergeometry.setAttribute("normal", new Float32BufferAttribute(geometry.normals, 3));
+          }
+          if (geometry.colors.length > 0) {
+            hasVertexColors = true;
+            buffergeometry.setAttribute("color", new Float32BufferAttribute(geometry.colors, 3));
+          }
+          if (geometry.hasUVIndices === true) {
+            buffergeometry.setAttribute("uv", new Float32BufferAttribute(geometry.uvs, 2));
+          }
+          const createdMaterials = [];
+          for (let mi = 0, miLen = materials.length; mi < miLen; mi++) {
+            const sourceMaterial = materials[mi];
+            const materialHash = sourceMaterial.name + "_" + sourceMaterial.smooth + "_" + hasVertexColors;
+            let material = state.materials[materialHash];
+            if (this.materials !== null) {
+              material = this.materials.create(sourceMaterial.name);
+              if (isLine && material && !(material instanceof LineBasicMaterial)) {
+                const materialLine = new LineBasicMaterial();
+                Material.prototype.copy.call(materialLine, material);
+                materialLine.color.copy(material.color);
+                material = materialLine;
+              } else if (isPoints && material && !(material instanceof PointsMaterial)) {
+                const materialPoints = new PointsMaterial({ size: 10, sizeAttenuation: false });
+                Material.prototype.copy.call(materialPoints, material);
+                materialPoints.color.copy(material.color);
+                materialPoints.map = material.map;
+                material = materialPoints;
+              }
+            }
+            if (material === void 0) {
+              if (isLine) {
+                material = new LineBasicMaterial();
+              } else if (isPoints) {
+                material = new PointsMaterial({ size: 1, sizeAttenuation: false });
+              } else {
+                material = new MeshPhongMaterial();
+              }
+              material.name = sourceMaterial.name;
+              material.flatShading = sourceMaterial.smooth ? false : true;
+              material.vertexColors = hasVertexColors;
+              state.materials[materialHash] = material;
+            }
+            createdMaterials.push(material);
+          }
+          let mesh;
+          if (createdMaterials.length > 1) {
+            for (let mi = 0, miLen = materials.length; mi < miLen; mi++) {
+              const sourceMaterial = materials[mi];
+              buffergeometry.addGroup(sourceMaterial.groupStart, sourceMaterial.groupCount, mi);
+            }
+            if (isLine) {
+              mesh = new LineSegments(buffergeometry, createdMaterials);
+            } else if (isPoints) {
+              mesh = new Points(buffergeometry, createdMaterials);
+            } else {
+              mesh = new Mesh(buffergeometry, createdMaterials);
+            }
+          } else {
+            if (isLine) {
+              mesh = new LineSegments(buffergeometry, createdMaterials[0]);
+            } else if (isPoints) {
+              mesh = new Points(buffergeometry, createdMaterials[0]);
+            } else {
+              mesh = new Mesh(buffergeometry, createdMaterials[0]);
+            }
+          }
+          mesh.name = object.name;
+          container.add(mesh);
+        }
+      } else {
+        if (state.vertices.length > 0) {
+          const material = new PointsMaterial({ size: 1, sizeAttenuation: false });
+          const buffergeometry = new BufferGeometry();
+          buffergeometry.setAttribute("position", new Float32BufferAttribute(state.vertices, 3));
+          if (state.colors.length > 0 && state.colors[0] !== void 0) {
+            buffergeometry.setAttribute("color", new Float32BufferAttribute(state.colors, 3));
+            material.vertexColors = true;
+          }
+          const points = new Points(buffergeometry, material);
+          container.add(points);
+        }
+      }
+      return container;
+    }
+  };
+
   // src/globe-scene.js
+  var FISH_OBJ_URL = "assets/fish/quaternius/Fish1.obj";
+  var fishPrototypePromise = null;
+  var fishPrototypeGeometry = null;
   function createGlobeScene(container, generator) {
     const scene = new Scene();
     scene.background = new Color(528937);
@@ -27160,6 +28240,7 @@ void main() {
     scene.add(createStars());
     const planetGroup = new Group();
     scene.add(planetGroup);
+    preloadFishPrototype();
     let mesh = null;
     let ocean = null;
     let atmosphere = null;
@@ -27372,6 +28453,36 @@ void main() {
       }
     };
   }
+  function preloadFishPrototype() {
+    if (fishPrototypeGeometry || fishPrototypePromise) return fishPrototypePromise;
+    fishPrototypePromise = new Promise((resolve) => {
+      const loader = new OBJLoader();
+      loader.load(
+        FISH_OBJ_URL,
+        (obj) => {
+          let meshGeometry = null;
+          obj.traverse((node) => {
+            if (!meshGeometry && node.isMesh && node.geometry) meshGeometry = node.geometry.clone();
+          });
+          if (meshGeometry) {
+            meshGeometry.computeBoundingBox();
+            if (meshGeometry.boundingBox) {
+              const center = new Vector3();
+              meshGeometry.boundingBox.getCenter(center);
+              meshGeometry.translate(-center.x, -center.y, -center.z);
+            }
+            meshGeometry.computeVertexNormals();
+            meshGeometry.scale(0.016, 0.016, 0.016);
+            fishPrototypeGeometry = meshGeometry;
+          }
+          resolve(fishPrototypeGeometry);
+        },
+        void 0,
+        () => resolve(null)
+      );
+    });
+    return fishPrototypePromise;
+  }
   function createTerrainSphere(result, generator) {
     const segments = resolutionSegments(result);
     const geometry = new SphereGeometry(1.55, segments, Math.max(48, Math.round(segments * 0.62)));
@@ -27452,6 +28563,7 @@ void main() {
     return texture;
   }
   function createSeaFish(seaNormals, playful, seed) {
+    preloadFishPrototype();
     const random = seededRandom(seed + 302);
     const color = playful ? 16751421 : 8181759;
     const fish = [];
@@ -27462,10 +28574,8 @@ void main() {
       const tangent = new Vector3().crossVectors(normal, new Vector3(0, 1, 0));
       if (tangent.lengthSq() < 1e-3) tangent.set(1, 0, 0);
       tangent.normalize();
-      const mesh = new Mesh(
-        new BoxGeometry(0.03, 0.03, 0.09),
-        new MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.06, emissive: color, emissiveIntensity: 0.14 })
-      );
+      const geometry = fishPrototypeGeometry ? fishPrototypeGeometry.clone() : new BoxGeometry(0.03, 0.03, 0.09);
+      const mesh = new Mesh(geometry, new MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.06, emissive: color, emissiveIntensity: 0.14 }));
       fish.push(mesh);
       fishJumpData.push({
         normal,

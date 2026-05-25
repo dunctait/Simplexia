@@ -1,4 +1,9 @@
 import * as THREE from 'three';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+
+const FISH_OBJ_URL = 'assets/fish/quaternius/Fish1.obj';
+let fishPrototypePromise = null;
+let fishPrototypeGeometry = null;
 
 export function createGlobeScene(container, generator) {
   const scene = new THREE.Scene();
@@ -19,6 +24,7 @@ export function createGlobeScene(container, generator) {
   scene.add(createStars());
   const planetGroup = new THREE.Group();
   scene.add(planetGroup);
+  preloadFishPrototype();
 
   let mesh = null;
   let ocean = null;
@@ -245,6 +251,37 @@ export function createGlobeScene(container, generator) {
   };
 }
 
+function preloadFishPrototype() {
+  if (fishPrototypeGeometry || fishPrototypePromise) return fishPrototypePromise;
+  fishPrototypePromise = new Promise((resolve) => {
+    const loader = new OBJLoader();
+    loader.load(
+      FISH_OBJ_URL,
+      (obj) => {
+        let meshGeometry = null;
+        obj.traverse((node) => {
+          if (!meshGeometry && node.isMesh && node.geometry) meshGeometry = node.geometry.clone();
+        });
+        if (meshGeometry) {
+          meshGeometry.computeBoundingBox();
+          if (meshGeometry.boundingBox) {
+            const center = new THREE.Vector3();
+            meshGeometry.boundingBox.getCenter(center);
+            meshGeometry.translate(-center.x, -center.y, -center.z);
+          }
+          meshGeometry.computeVertexNormals();
+          meshGeometry.scale(0.016, 0.016, 0.016);
+          fishPrototypeGeometry = meshGeometry;
+        }
+        resolve(fishPrototypeGeometry);
+      },
+      undefined,
+      () => resolve(null)
+    );
+  });
+  return fishPrototypePromise;
+}
+
 function createTerrainSphere(result, generator) {
   const segments = resolutionSegments(result);
   const geometry = new THREE.SphereGeometry(1.55, segments, Math.max(48, Math.round(segments * 0.62)));
@@ -330,6 +367,7 @@ function createCloudTexture(seed, coverage) {
 }
 
 function createSeaFish(seaNormals, playful, seed) {
+  preloadFishPrototype();
   const random = seededRandom(seed + 302);
   const color = playful ? 0xff9b3d : 0x7cd7ff;
   const fish = [];
@@ -340,10 +378,8 @@ function createSeaFish(seaNormals, playful, seed) {
     const tangent = new THREE.Vector3().crossVectors(normal, new THREE.Vector3(0, 1, 0));
     if (tangent.lengthSq() < 0.001) tangent.set(1, 0, 0);
     tangent.normalize();
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.03, 0.03, 0.09),
-      new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.06, emissive: color, emissiveIntensity: 0.14 })
-    );
+    const geometry = fishPrototypeGeometry ? fishPrototypeGeometry.clone() : new THREE.BoxGeometry(0.03, 0.03, 0.09);
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.06, emissive: color, emissiveIntensity: 0.14 }));
     fish.push(mesh);
     fishJumpData.push({
       normal,
