@@ -90,6 +90,8 @@ export function createGlobeScene(container, generator) {
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       const nextDistance = Math.hypot(a.x - b.x, a.y - b.y);
+      velocityX = 0;
+      velocityY = 0;
       if (pinchDistance > 0) applyZoom((pinchDistance - nextDistance) * 0.0105);
       pinchDistance = nextDistance;
       return;
@@ -109,12 +111,20 @@ export function createGlobeScene(container, generator) {
   container.addEventListener('pointerup', (event) => {
     pointers.delete(event.pointerId);
     dragging = pointers.size > 0;
-    if (pointers.size < 2) pinchDistance = 0;
+    if (pointers.size < 2) {
+      pinchDistance = 0;
+      velocityX = 0;
+      velocityY = 0;
+    }
   });
   container.addEventListener('pointercancel', (event) => {
     pointers.delete(event.pointerId);
     dragging = pointers.size > 0;
-    if (pointers.size < 2) pinchDistance = 0;
+    if (pointers.size < 2) {
+      pinchDistance = 0;
+      velocityX = 0;
+      velocityY = 0;
+    }
   });
 
   function applyZoom(delta) {
@@ -179,8 +189,9 @@ export function createGlobeScene(container, generator) {
     if (buildingPrototypeGeometries.length) buildingRefreshTriggered = true;
     animals = createLandAnimals(markers.landByBiome, playful, settings.seed);
 
-    [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish].filter(Boolean).forEach((item) => planetGroup.add(item));
-    moons.map((item) => item.mesh).forEach((item) => scene.add(item));
+    [mesh, ocean, atmosphere, clouds, rings, ...towns, ...animals, ...fish, ...moons.map((item) => item.mesh)]
+      .filter(Boolean)
+      .forEach((item) => planetGroup.add(item));
 
     container.dataset.resolution = String(result.settings.resolution);
     container.dataset.vertexCount = String(geometry.attributes.position.count);
@@ -198,7 +209,7 @@ export function createGlobeScene(container, generator) {
       if (!item) return;
       if (item.geometry) item.geometry.dispose();
       if (item.material) item.material.dispose();
-      scene.remove(item);
+      planetGroup.remove(item);
     });
     mesh = null;
     ocean = null;
@@ -323,7 +334,10 @@ function preloadBuildingPrototypes() {
 function loadObjGeometry(url) {
   return new Promise((resolve) => {
     const loader = new OBJLoader();
-    loader.load(url, (obj) => {
+    fetch(url)
+      .then((response) => (response.ok ? response.text() : Promise.reject(new Error(`Failed ${url}`))))
+      .then((text) => {
+        const obj = loader.parse(text);
       let geometry = null;
       obj.traverse((node) => {
         if (!geometry && node.isMesh && node.geometry) geometry = node.geometry.clone();
@@ -345,7 +359,8 @@ function loadObjGeometry(url) {
       }
       geometry.computeVertexNormals();
       resolve(geometry);
-    }, undefined, () => resolve(null));
+      })
+      .catch(() => resolve(null));
   });
 }
 
