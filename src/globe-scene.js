@@ -101,8 +101,9 @@ export function createGlobeScene(container, generator) {
     const dx = event.clientX - lastX;
     const dy = event.clientY - lastY;
     if (dx !== 0 || dy !== 0) autoSpin = false;
-    velocityY = dx * 0.011;
-    velocityX = dy * 0.0085;
+    const zoomFactor = Math.max(0.55, Math.min(1.45, cameraDistance / 5.5));
+    velocityY = dx * 0.011 * zoomFactor;
+    velocityX = dy * 0.0085 * zoomFactor;
     applyOrbitDelta(velocityY, velocityX);
     lastX = event.clientX;
     lastY = event.clientY;
@@ -183,7 +184,7 @@ export function createGlobeScene(container, generator) {
     );
     if (settings.cloudCoverage > 0.01) clouds = createCloudLayer(segments, settings.seed, settings.cloudCoverage);
     if (settings.showRings) rings = createRings(playful);
-    if (settings.showMoons) moons = createMoons(playful);
+    if (settings.moonCount > 0) moons = createMoons(playful, settings.moonCount, settings.seed);
     if (settings.showFish) ({ fish, fishJumpData } = createSeaFish(markers.sea, playful, settings.seed));
     towns = createTowns(markers.landByBiome[1], markers.landByBiome[2], playful, settings.seed);
     if (buildingPrototypeGeometries.length) buildingRefreshTriggered = true;
@@ -541,12 +542,21 @@ function createRings(playful) {
   );
 }
 
-function createMoons(playful) {
+function createMoons(playful, count, seed) {
+  const random = seededRandom(seed + 2103);
   const moonMaterial = new THREE.MeshStandardMaterial({ color: playful ? 0xf6f2ff : 0xd9dde5, roughness: 0.9, metalness: 0 });
-  return [
-    { mesh: new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 18), moonMaterial.clone()), radius: 3.2, height: 0.42, speed: 0.42, offset: 0 },
-    { mesh: new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), moonMaterial.clone()), radius: 2.7, height: -0.34, speed: -0.58, offset: Math.PI * 0.7 }
-  ];
+  const moons = [];
+  for (let i = 0; i < count; i += 1) {
+    const size = 0.05 + random() * 0.11;
+    moons.push({
+      mesh: new THREE.Mesh(new THREE.SphereGeometry(size, 16, 12), moonMaterial.clone()),
+      radius: 2.3 + random() * 1.8,
+      height: -0.6 + random() * 1.2,
+      speed: (0.2 + random() * 0.8) * (i % 2 ? -1 : 1),
+      offset: random() * Math.PI * 2
+    });
+  }
+  return moons;
 }
 
 function createStars() {

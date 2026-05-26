@@ -13,8 +13,8 @@
     mountainLevel: 0.6,
     playfulPalette: 1,
     cloudCoverage: 0.55,
+    moonCount: 2,
     showRings: 0,
-    showMoons: 1,
     showFish: 0,
     biomePreset: 'classic',
     seed: 0
@@ -56,6 +56,7 @@
     if (input.scale && !input.surfaceScale) settings.surfaceScale = clampNumber(input.scale * 180, 1, 9);
     if (input.continentScale && !input.landmassFrequency) settings.landmassFrequency = input.continentScale;
     if (typeof input.showClouds !== 'undefined' && typeof input.cloudCoverage === 'undefined') settings.cloudCoverage = input.showClouds ? 0.55 : 0;
+    if (typeof input.showMoons !== 'undefined' && typeof input.moonCount === 'undefined') settings.moonCount = input.showMoons ? 2 : 0;
     settings.resolution = clampInt(settings.resolution, 64, 384);
     settings.landmassFrequency = clampNumber(settings.landmassFrequency, 0.45, 2.8);
     settings.surfaceScale = clampNumber(settings.surfaceScale, 1, 9);
@@ -67,8 +68,8 @@
     settings.mountainLevel = clampNumber(Math.max(settings.mountainLevel, settings.beachLevel + 0.01), 0.3, 0.95);
     settings.playfulPalette = clampInt(settings.playfulPalette, 0, 1);
     settings.cloudCoverage = clampNumber(settings.cloudCoverage, 0, 1);
+    settings.moonCount = clampInt(settings.moonCount, 0, 24);
     settings.showRings = clampInt(settings.showRings, 0, 1);
-    settings.showMoons = clampInt(settings.showMoons, 0, 1);
     settings.showFish = clampInt(settings.showFish, 0, 1);
     settings.biomePreset = BIOME_PRESETS[settings.biomePreset] ? settings.biomePreset : DEFAULT_SETTINGS.biomePreset;
     return settings;
