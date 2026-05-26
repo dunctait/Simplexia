@@ -12707,156 +12707,6 @@ var IslandGlobeBundle = (() => {
       return new _BoxGeometry(data.width, data.height, data.depth, data.widthSegments, data.heightSegments, data.depthSegments);
     }
   };
-  var CylinderGeometry = class _CylinderGeometry extends BufferGeometry {
-    /**
-     * Constructs a new cylinder geometry.
-     *
-     * @param {number} [radiusTop=1] - Radius of the cylinder at the top.
-     * @param {number} [radiusBottom=1] - Radius of the cylinder at the bottom.
-     * @param {number} [height=1] - Height of the cylinder.
-     * @param {number} [radialSegments=32] - Number of segmented faces around the circumference of the cylinder.
-     * @param {number} [heightSegments=1] - Number of rows of faces along the height of the cylinder.
-     * @param {boolean} [openEnded=false] - Whether the base of the cylinder is open or capped.
-     * @param {number} [thetaStart=0] - Start angle for first segment, in radians.
-     * @param {number} [thetaLength=Math.PI*2] - The central angle, often called theta, of the circular sector, in radians.
-     * The default value results in a complete cylinder.
-     */
-    constructor(radiusTop = 1, radiusBottom = 1, height = 1, radialSegments = 32, heightSegments = 1, openEnded = false, thetaStart = 0, thetaLength = Math.PI * 2) {
-      super();
-      this.type = "CylinderGeometry";
-      this.parameters = {
-        radiusTop,
-        radiusBottom,
-        height,
-        radialSegments,
-        heightSegments,
-        openEnded,
-        thetaStart,
-        thetaLength
-      };
-      const scope = this;
-      radialSegments = Math.floor(radialSegments);
-      heightSegments = Math.floor(heightSegments);
-      const indices = [];
-      const vertices = [];
-      const normals = [];
-      const uvs = [];
-      let index = 0;
-      const indexArray = [];
-      const halfHeight = height / 2;
-      let groupStart = 0;
-      generateTorso();
-      if (openEnded === false) {
-        if (radiusTop > 0) generateCap(true);
-        if (radiusBottom > 0) generateCap(false);
-      }
-      this.setIndex(indices);
-      this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
-      this.setAttribute("normal", new Float32BufferAttribute(normals, 3));
-      this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
-      function generateTorso() {
-        const normal = new Vector3();
-        const vertex2 = new Vector3();
-        let groupCount = 0;
-        const slope = (radiusBottom - radiusTop) / height;
-        for (let y = 0; y <= heightSegments; y++) {
-          const indexRow = [];
-          const v = y / heightSegments;
-          const radius = v * (radiusBottom - radiusTop) + radiusTop;
-          for (let x = 0; x <= radialSegments; x++) {
-            const u = x / radialSegments;
-            const theta = u * thetaLength + thetaStart;
-            const sinTheta = Math.sin(theta);
-            const cosTheta = Math.cos(theta);
-            vertex2.x = radius * sinTheta;
-            vertex2.y = -v * height + halfHeight;
-            vertex2.z = radius * cosTheta;
-            vertices.push(vertex2.x, vertex2.y, vertex2.z);
-            normal.set(sinTheta, slope, cosTheta).normalize();
-            normals.push(normal.x, normal.y, normal.z);
-            uvs.push(u, 1 - v);
-            indexRow.push(index++);
-          }
-          indexArray.push(indexRow);
-        }
-        for (let x = 0; x < radialSegments; x++) {
-          for (let y = 0; y < heightSegments; y++) {
-            const a = indexArray[y][x];
-            const b = indexArray[y + 1][x];
-            const c = indexArray[y + 1][x + 1];
-            const d = indexArray[y][x + 1];
-            if (radiusTop > 0 || y !== 0) {
-              indices.push(a, b, d);
-              groupCount += 3;
-            }
-            if (radiusBottom > 0 || y !== heightSegments - 1) {
-              indices.push(b, c, d);
-              groupCount += 3;
-            }
-          }
-        }
-        scope.addGroup(groupStart, groupCount, 0);
-        groupStart += groupCount;
-      }
-      function generateCap(top) {
-        const centerIndexStart = index;
-        const uv = new Vector2();
-        const vertex2 = new Vector3();
-        let groupCount = 0;
-        const radius = top === true ? radiusTop : radiusBottom;
-        const sign = top === true ? 1 : -1;
-        for (let x = 1; x <= radialSegments; x++) {
-          vertices.push(0, halfHeight * sign, 0);
-          normals.push(0, sign, 0);
-          uvs.push(0.5, 0.5);
-          index++;
-        }
-        const centerIndexEnd = index;
-        for (let x = 0; x <= radialSegments; x++) {
-          const u = x / radialSegments;
-          const theta = u * thetaLength + thetaStart;
-          const cosTheta = Math.cos(theta);
-          const sinTheta = Math.sin(theta);
-          vertex2.x = radius * sinTheta;
-          vertex2.y = halfHeight * sign;
-          vertex2.z = radius * cosTheta;
-          vertices.push(vertex2.x, vertex2.y, vertex2.z);
-          normals.push(0, sign, 0);
-          uv.x = cosTheta * 0.5 + 0.5;
-          uv.y = sinTheta * 0.5 * sign + 0.5;
-          uvs.push(uv.x, uv.y);
-          index++;
-        }
-        for (let x = 0; x < radialSegments; x++) {
-          const c = centerIndexStart + x;
-          const i = centerIndexEnd + x;
-          if (top === true) {
-            indices.push(i, i + 1, c);
-          } else {
-            indices.push(i + 1, i, c);
-          }
-          groupCount += 3;
-        }
-        scope.addGroup(groupStart, groupCount, top === true ? 1 : 2);
-        groupStart += groupCount;
-      }
-    }
-    copy(source) {
-      super.copy(source);
-      this.parameters = Object.assign({}, source.parameters);
-      return this;
-    }
-    /**
-     * Factory method for creating an instance of this class from the given
-     * JSON object.
-     *
-     * @param {Object} data - A JSON object representing the serialized geometry.
-     * @return {CylinderGeometry} A new instance.
-     */
-    static fromJSON(data) {
-      return new _CylinderGeometry(data.radiusTop, data.radiusBottom, data.height, data.radialSegments, data.heightSegments, data.openEnded, data.thetaStart, data.thetaLength);
-    }
-  };
   var PlaneGeometry = class _PlaneGeometry extends BufferGeometry {
     /**
      * Constructs a new plane geometry.
@@ -28385,7 +28235,8 @@ void main() {
     const scene = new Scene();
     scene.background = new Color(528937);
     const camera = new PerspectiveCamera(42, 1, 0.1, 100);
-    let cameraDistance = 5.5;
+    const zoomLimits = { min: 1.8, max: 16.5 };
+    let cameraDistance = zoomLimits.max;
     camera.position.set(0, 0.2, cameraDistance);
     const renderer = new WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -28471,7 +28322,7 @@ void main() {
       const dx = event.clientX - lastX;
       const dy = event.clientY - lastY;
       if (dx !== 0 || dy !== 0) autoSpin = false;
-      const zoomFactor = Math.max(0.55, Math.min(1.45, cameraDistance / 5.5));
+      const zoomFactor = Math.max(0.4, Math.min(2.1, cameraDistance / 8.5));
       velocityY = dx * 0.011 * zoomFactor;
       velocityX = dy * 85e-4 * zoomFactor;
       applyOrbitDelta(velocityY, velocityX);
@@ -28501,7 +28352,7 @@ void main() {
     });
     function applyZoom(delta) {
       if (Math.abs(delta) > 1e-5) autoSpin = false;
-      cameraDistance = Math.max(3.3, Math.min(8.6, cameraDistance + delta));
+      cameraDistance = Math.max(zoomLimits.min, Math.min(zoomLimits.max, cameraDistance + delta));
       camera.position.z = cameraDistance;
       camera.updateProjectionMatrix();
       draw();
@@ -28834,9 +28685,10 @@ void main() {
     const pool = [...beach.slice(0, 70), ...forest.slice(0, 70)];
     const towns = [];
     const baseColor = playful ? 16049349 : 14800319;
+    if (!buildingPrototypeGeometries.length) return towns;
     for (let i = 0; i < Math.min(16, pool.length); i += 1) {
       const n = pool[Math.floor(random() * pool.length)];
-      const geometry = buildingPrototypeGeometries.length ? buildingPrototypeGeometries[Math.floor(random() * buildingPrototypeGeometries.length)].clone() : createFallbackHouseGeometry(0.11, 0.07, 0.06);
+      const geometry = buildingPrototypeGeometries[Math.floor(random() * buildingPrototypeGeometries.length)].clone();
       const mesh = new Mesh(geometry, new MeshStandardMaterial({ color: baseColor, roughness: 0.9, metalness: 0 }));
       const h = 1.565 + random() * 0.01;
       mesh.position.set(n.x * h, n.y * h, n.z * h);
@@ -28846,9 +28698,6 @@ void main() {
       towns.push(mesh);
     }
     return towns;
-  }
-  function createFallbackHouseGeometry(width, height, roofHeight) {
-    return new CylinderGeometry(width * 0.45, width * 0.62, height + roofHeight, 6);
   }
   function createLandAnimals(landByBiome, playful, seed) {
     const random = seededRandom(seed + 1401);

@@ -17,7 +17,8 @@ export function createGlobeScene(container, generator) {
   scene.background = new THREE.Color(0x081229);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-  let cameraDistance = 5.5;
+  const zoomLimits = { min: 1.8, max: 16.5 };
+  let cameraDistance = zoomLimits.max;
   camera.position.set(0, 0.2, cameraDistance);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
@@ -107,7 +108,7 @@ export function createGlobeScene(container, generator) {
     const dx = event.clientX - lastX;
     const dy = event.clientY - lastY;
     if (dx !== 0 || dy !== 0) autoSpin = false;
-    const zoomFactor = Math.max(0.55, Math.min(1.45, cameraDistance / 5.5));
+    const zoomFactor = Math.max(0.4, Math.min(2.1, cameraDistance / 8.5));
     velocityY = dx * 0.011 * zoomFactor;
     velocityX = dy * 0.0085 * zoomFactor;
     applyOrbitDelta(velocityY, velocityX);
@@ -138,7 +139,7 @@ export function createGlobeScene(container, generator) {
 
   function applyZoom(delta) {
     if (Math.abs(delta) > 0.00001) autoSpin = false;
-    cameraDistance = Math.max(3.3, Math.min(8.6, cameraDistance + delta));
+    cameraDistance = Math.max(zoomLimits.min, Math.min(zoomLimits.max, cameraDistance + delta));
     camera.position.z = cameraDistance;
     camera.updateProjectionMatrix();
     draw();
@@ -501,11 +502,10 @@ function createTowns(beach, forest, playful, seed) {
   const pool = [...beach.slice(0, 70), ...forest.slice(0, 70)];
   const towns = [];
   const baseColor = playful ? 0xf4e4c5 : 0xe1d5bf;
+  if (!buildingPrototypeGeometries.length) return towns;
   for (let i = 0; i < Math.min(16, pool.length); i += 1) {
     const n = pool[Math.floor(random() * pool.length)];
-    const geometry = buildingPrototypeGeometries.length
-      ? buildingPrototypeGeometries[Math.floor(random() * buildingPrototypeGeometries.length)].clone()
-      : createFallbackHouseGeometry(0.11, 0.07, 0.06);
+    const geometry = buildingPrototypeGeometries[Math.floor(random() * buildingPrototypeGeometries.length)].clone();
     const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.9, metalness: 0 }));
     const h = 1.565 + random() * 0.01;
     mesh.position.set(n.x * h, n.y * h, n.z * h);
@@ -515,10 +515,6 @@ function createTowns(beach, forest, playful, seed) {
     towns.push(mesh);
   }
   return towns;
-}
-
-function createFallbackHouseGeometry(width, height, roofHeight) {
-  return new THREE.CylinderGeometry(width * 0.45, width * 0.62, height + roofHeight, 6);
 }
 
 function createLandAnimals(landByBiome, playful, seed) {
