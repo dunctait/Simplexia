@@ -520,23 +520,80 @@ function createTowns(beach, forest, playful, seed) {
 function createLandAnimals(landByBiome, playful, seed) {
   const random = seededRandom(seed + 1401);
   const animals = [];
-  const biomeColors = playful ? [0, 0xffd66f, 0x7dff87, 0xfff0f0] : [0, 0xc8b089, 0x80c072, 0xdad9de];
+  const groupsByBiome = [null, new Map(), new Map(), new Map()];
   for (let biome = 1; biome <= 3; biome += 1) {
-    const points = landByBiome[biome];
-    const total = Math.min(10, points.length);
-    for (let i = 0; i < total; i += 1) {
-      const n = points[Math.floor(random() * points.length)];
-      const body = new THREE.Mesh(
-        new THREE.BoxGeometry(0.035, 0.03, 0.05),
-        new THREE.MeshStandardMaterial({ color: biomeColors[biome], roughness: 0.7, metalness: 0 })
-      );
-      const h = 1.566 + random() * 0.008;
-      body.position.set(n.x * h, n.y * h, n.z * h);
-      body.lookAt(body.position.clone().multiplyScalar(2));
-      animals.push(body);
-    }
+    landByBiome[biome].forEach((normal) => {
+      const key = octantKey(normal);
+      if (!groupsByBiome[biome].has(key)) groupsByBiome[biome].set(key, []);
+      groupsByBiome[biome].get(key).push(normal);
+    });
+  }
+  const faunaByBiome = {
+    1: ['turtle', 'boar', 'rabbit'],
+    2: ['deer', 'fox', 'bird'],
+    3: ['goat', 'yak', 'hawk']
+  };
+  const paletteByBiome = playful
+    ? { 1: [0xffd46b, 0xffaf7a, 0xf5f0d8], 2: [0x80e36e, 0xffb06e, 0x85ffd9], 3: [0xe4e8ff, 0xb7c2ff, 0xffffff] }
+    : { 1: [0xc8b089, 0xb88a66, 0xd8d0ba], 2: [0x80c072, 0x9f8b63, 0x7fa5a1], 3: [0xdad9de, 0x9ea7b8, 0xe8eef6] };
+  for (let biome = 1; biome <= 3; biome += 1) {
+    groupsByBiome[biome].forEach((points, octant) => {
+      if (!points.length) return;
+      const fauna = faunaByBiome[biome];
+      const colorChoices = paletteByBiome[biome];
+      const pick = (octant * 17 + biome * 11 + Math.floor(seed)) % fauna.length;
+      const animalType = fauna[pick];
+      const color = colorChoices[pick % colorChoices.length];
+      const amount = Math.min(4, Math.max(1, Math.floor(points.length / 6)));
+      for (let i = 0; i < amount; i += 1) {
+        const n = points[Math.floor(random() * points.length)];
+        const animal = createAnimalMesh(animalType, color);
+        const h = 1.566 + random() * 0.008;
+        animal.position.set(n.x * h, n.y * h, n.z * h);
+        animal.lookAt(animal.position.clone().multiplyScalar(2));
+        animal.rotateY(random() * Math.PI * 2);
+        animals.push(animal);
+      }
+    });
   }
   return animals;
+}
+
+function octantKey(normal) {
+  const x = normal.x >= 0 ? 1 : 0;
+  const y = normal.y >= 0 ? 1 : 0;
+  const z = normal.z >= 0 ? 1 : 0;
+  return (x << 2) | (y << 1) | z;
+}
+
+function createAnimalMesh(type, color) {
+  const material = new THREE.MeshStandardMaterial({ color, roughness: 0.8, metalness: 0 });
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), material);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), material.clone());
+  head.position.set(0, 0.004, 0.016);
+  group.add(body);
+  group.add(head);
+  if (type === 'bird' || type === 'hawk') {
+    const wingL = new THREE.Mesh(new THREE.TetrahedronGeometry(0.01), material.clone());
+    const wingR = wingL.clone();
+    wingL.position.set(-0.016, 0, 0);
+    wingR.position.set(0.016, 0, 0);
+    group.add(wingL, wingR);
+  } else if (type === 'deer' || type === 'goat' || type === 'yak') {
+    const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.003, 0.01, 5), material.clone());
+    const hornR = hornL.clone();
+    hornL.position.set(-0.004, 0.014, 0.019);
+    hornR.position.set(0.004, 0.014, 0.019);
+    group.add(hornL, hornR);
+  } else if (type === 'rabbit' || type === 'fox') {
+    const earL = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.012, 0.003), material.clone());
+    const earR = earL.clone();
+    earL.position.set(-0.0035, 0.014, 0.017);
+    earR.position.set(0.0035, 0.014, 0.017);
+    group.add(earL, earR);
+  }
+  return group;
 }
 
 function getPalette(presetId, playful, presets) {

@@ -12707,6 +12707,367 @@ var IslandGlobeBundle = (() => {
       return new _BoxGeometry(data.width, data.height, data.depth, data.widthSegments, data.heightSegments, data.depthSegments);
     }
   };
+  var CylinderGeometry = class _CylinderGeometry extends BufferGeometry {
+    /**
+     * Constructs a new cylinder geometry.
+     *
+     * @param {number} [radiusTop=1] - Radius of the cylinder at the top.
+     * @param {number} [radiusBottom=1] - Radius of the cylinder at the bottom.
+     * @param {number} [height=1] - Height of the cylinder.
+     * @param {number} [radialSegments=32] - Number of segmented faces around the circumference of the cylinder.
+     * @param {number} [heightSegments=1] - Number of rows of faces along the height of the cylinder.
+     * @param {boolean} [openEnded=false] - Whether the base of the cylinder is open or capped.
+     * @param {number} [thetaStart=0] - Start angle for first segment, in radians.
+     * @param {number} [thetaLength=Math.PI*2] - The central angle, often called theta, of the circular sector, in radians.
+     * The default value results in a complete cylinder.
+     */
+    constructor(radiusTop = 1, radiusBottom = 1, height = 1, radialSegments = 32, heightSegments = 1, openEnded = false, thetaStart = 0, thetaLength = Math.PI * 2) {
+      super();
+      this.type = "CylinderGeometry";
+      this.parameters = {
+        radiusTop,
+        radiusBottom,
+        height,
+        radialSegments,
+        heightSegments,
+        openEnded,
+        thetaStart,
+        thetaLength
+      };
+      const scope = this;
+      radialSegments = Math.floor(radialSegments);
+      heightSegments = Math.floor(heightSegments);
+      const indices = [];
+      const vertices = [];
+      const normals = [];
+      const uvs = [];
+      let index = 0;
+      const indexArray = [];
+      const halfHeight = height / 2;
+      let groupStart = 0;
+      generateTorso();
+      if (openEnded === false) {
+        if (radiusTop > 0) generateCap(true);
+        if (radiusBottom > 0) generateCap(false);
+      }
+      this.setIndex(indices);
+      this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+      this.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+      this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+      function generateTorso() {
+        const normal = new Vector3();
+        const vertex2 = new Vector3();
+        let groupCount = 0;
+        const slope = (radiusBottom - radiusTop) / height;
+        for (let y = 0; y <= heightSegments; y++) {
+          const indexRow = [];
+          const v = y / heightSegments;
+          const radius = v * (radiusBottom - radiusTop) + radiusTop;
+          for (let x = 0; x <= radialSegments; x++) {
+            const u = x / radialSegments;
+            const theta = u * thetaLength + thetaStart;
+            const sinTheta = Math.sin(theta);
+            const cosTheta = Math.cos(theta);
+            vertex2.x = radius * sinTheta;
+            vertex2.y = -v * height + halfHeight;
+            vertex2.z = radius * cosTheta;
+            vertices.push(vertex2.x, vertex2.y, vertex2.z);
+            normal.set(sinTheta, slope, cosTheta).normalize();
+            normals.push(normal.x, normal.y, normal.z);
+            uvs.push(u, 1 - v);
+            indexRow.push(index++);
+          }
+          indexArray.push(indexRow);
+        }
+        for (let x = 0; x < radialSegments; x++) {
+          for (let y = 0; y < heightSegments; y++) {
+            const a = indexArray[y][x];
+            const b = indexArray[y + 1][x];
+            const c = indexArray[y + 1][x + 1];
+            const d = indexArray[y][x + 1];
+            if (radiusTop > 0 || y !== 0) {
+              indices.push(a, b, d);
+              groupCount += 3;
+            }
+            if (radiusBottom > 0 || y !== heightSegments - 1) {
+              indices.push(b, c, d);
+              groupCount += 3;
+            }
+          }
+        }
+        scope.addGroup(groupStart, groupCount, 0);
+        groupStart += groupCount;
+      }
+      function generateCap(top) {
+        const centerIndexStart = index;
+        const uv = new Vector2();
+        const vertex2 = new Vector3();
+        let groupCount = 0;
+        const radius = top === true ? radiusTop : radiusBottom;
+        const sign = top === true ? 1 : -1;
+        for (let x = 1; x <= radialSegments; x++) {
+          vertices.push(0, halfHeight * sign, 0);
+          normals.push(0, sign, 0);
+          uvs.push(0.5, 0.5);
+          index++;
+        }
+        const centerIndexEnd = index;
+        for (let x = 0; x <= radialSegments; x++) {
+          const u = x / radialSegments;
+          const theta = u * thetaLength + thetaStart;
+          const cosTheta = Math.cos(theta);
+          const sinTheta = Math.sin(theta);
+          vertex2.x = radius * sinTheta;
+          vertex2.y = halfHeight * sign;
+          vertex2.z = radius * cosTheta;
+          vertices.push(vertex2.x, vertex2.y, vertex2.z);
+          normals.push(0, sign, 0);
+          uv.x = cosTheta * 0.5 + 0.5;
+          uv.y = sinTheta * 0.5 * sign + 0.5;
+          uvs.push(uv.x, uv.y);
+          index++;
+        }
+        for (let x = 0; x < radialSegments; x++) {
+          const c = centerIndexStart + x;
+          const i = centerIndexEnd + x;
+          if (top === true) {
+            indices.push(i, i + 1, c);
+          } else {
+            indices.push(i + 1, i, c);
+          }
+          groupCount += 3;
+        }
+        scope.addGroup(groupStart, groupCount, top === true ? 1 : 2);
+        groupStart += groupCount;
+      }
+    }
+    copy(source) {
+      super.copy(source);
+      this.parameters = Object.assign({}, source.parameters);
+      return this;
+    }
+    /**
+     * Factory method for creating an instance of this class from the given
+     * JSON object.
+     *
+     * @param {Object} data - A JSON object representing the serialized geometry.
+     * @return {CylinderGeometry} A new instance.
+     */
+    static fromJSON(data) {
+      return new _CylinderGeometry(data.radiusTop, data.radiusBottom, data.height, data.radialSegments, data.heightSegments, data.openEnded, data.thetaStart, data.thetaLength);
+    }
+  };
+  var ConeGeometry = class _ConeGeometry extends CylinderGeometry {
+    /**
+     * Constructs a new cone geometry.
+     *
+     * @param {number} [radius=1] - Radius of the cone base.
+     * @param {number} [height=1] - Height of the cone.
+     * @param {number} [radialSegments=32] - Number of segmented faces around the circumference of the cone.
+     * @param {number} [heightSegments=1] - Number of rows of faces along the height of the cone.
+     * @param {boolean} [openEnded=false] - Whether the base of the cone is open or capped.
+     * @param {number} [thetaStart=0] - Start angle for first segment, in radians.
+     * @param {number} [thetaLength=Math.PI*2] - The central angle, often called theta, of the circular sector, in radians.
+     * The default value results in a complete cone.
+     */
+    constructor(radius = 1, height = 1, radialSegments = 32, heightSegments = 1, openEnded = false, thetaStart = 0, thetaLength = Math.PI * 2) {
+      super(0, radius, height, radialSegments, heightSegments, openEnded, thetaStart, thetaLength);
+      this.type = "ConeGeometry";
+      this.parameters = {
+        radius,
+        height,
+        radialSegments,
+        heightSegments,
+        openEnded,
+        thetaStart,
+        thetaLength
+      };
+    }
+    /**
+     * Factory method for creating an instance of this class from the given
+     * JSON object.
+     *
+     * @param {Object} data - A JSON object representing the serialized geometry.
+     * @return {ConeGeometry} A new instance.
+     */
+    static fromJSON(data) {
+      return new _ConeGeometry(data.radius, data.height, data.radialSegments, data.heightSegments, data.openEnded, data.thetaStart, data.thetaLength);
+    }
+  };
+  var PolyhedronGeometry = class _PolyhedronGeometry extends BufferGeometry {
+    /**
+     * Constructs a new polyhedron geometry.
+     *
+     * @param {Array<number>} [vertices] - A flat array of vertices describing the base shape.
+     * @param {Array<number>} [indices] - A flat array of indices describing the base shape.
+     * @param {number} [radius=1] - The radius of the shape.
+     * @param {number} [detail=0] - How many levels to subdivide the geometry. The more detail, the smoother the shape.
+     */
+    constructor(vertices = [], indices = [], radius = 1, detail = 0) {
+      super();
+      this.type = "PolyhedronGeometry";
+      this.parameters = {
+        vertices,
+        indices,
+        radius,
+        detail
+      };
+      const vertexBuffer = [];
+      const uvBuffer = [];
+      subdivide(detail);
+      applyRadius(radius);
+      generateUVs();
+      this.setAttribute("position", new Float32BufferAttribute(vertexBuffer, 3));
+      this.setAttribute("normal", new Float32BufferAttribute(vertexBuffer.slice(), 3));
+      this.setAttribute("uv", new Float32BufferAttribute(uvBuffer, 2));
+      if (detail === 0) {
+        this.computeVertexNormals();
+      } else {
+        this.normalizeNormals();
+      }
+      function subdivide(detail2) {
+        const a = new Vector3();
+        const b = new Vector3();
+        const c = new Vector3();
+        for (let i = 0; i < indices.length; i += 3) {
+          getVertexByIndex(indices[i + 0], a);
+          getVertexByIndex(indices[i + 1], b);
+          getVertexByIndex(indices[i + 2], c);
+          subdivideFace(a, b, c, detail2);
+        }
+      }
+      function subdivideFace(a, b, c, detail2) {
+        const cols = detail2 + 1;
+        const v = [];
+        for (let i = 0; i <= cols; i++) {
+          v[i] = [];
+          const aj = a.clone().lerp(c, i / cols);
+          const bj = b.clone().lerp(c, i / cols);
+          const rows = cols - i;
+          for (let j = 0; j <= rows; j++) {
+            if (j === 0 && i === cols) {
+              v[i][j] = aj;
+            } else {
+              v[i][j] = aj.clone().lerp(bj, j / rows);
+            }
+          }
+        }
+        for (let i = 0; i < cols; i++) {
+          for (let j = 0; j < 2 * (cols - i) - 1; j++) {
+            const k = Math.floor(j / 2);
+            if (j % 2 === 0) {
+              pushVertex(v[i][k + 1]);
+              pushVertex(v[i + 1][k]);
+              pushVertex(v[i][k]);
+            } else {
+              pushVertex(v[i][k + 1]);
+              pushVertex(v[i + 1][k + 1]);
+              pushVertex(v[i + 1][k]);
+            }
+          }
+        }
+      }
+      function applyRadius(radius2) {
+        const vertex2 = new Vector3();
+        for (let i = 0; i < vertexBuffer.length; i += 3) {
+          vertex2.x = vertexBuffer[i + 0];
+          vertex2.y = vertexBuffer[i + 1];
+          vertex2.z = vertexBuffer[i + 2];
+          vertex2.normalize().multiplyScalar(radius2);
+          vertexBuffer[i + 0] = vertex2.x;
+          vertexBuffer[i + 1] = vertex2.y;
+          vertexBuffer[i + 2] = vertex2.z;
+        }
+      }
+      function generateUVs() {
+        const vertex2 = new Vector3();
+        for (let i = 0; i < vertexBuffer.length; i += 3) {
+          vertex2.x = vertexBuffer[i + 0];
+          vertex2.y = vertexBuffer[i + 1];
+          vertex2.z = vertexBuffer[i + 2];
+          const u = azimuth(vertex2) / 2 / Math.PI + 0.5;
+          const v = inclination(vertex2) / Math.PI + 0.5;
+          uvBuffer.push(u, 1 - v);
+        }
+        correctUVs();
+        correctSeam();
+      }
+      function correctSeam() {
+        for (let i = 0; i < uvBuffer.length; i += 6) {
+          const x0 = uvBuffer[i + 0];
+          const x1 = uvBuffer[i + 2];
+          const x2 = uvBuffer[i + 4];
+          const max = Math.max(x0, x1, x2);
+          const min = Math.min(x0, x1, x2);
+          if (max > 0.9 && min < 0.1) {
+            if (x0 < 0.2) uvBuffer[i + 0] += 1;
+            if (x1 < 0.2) uvBuffer[i + 2] += 1;
+            if (x2 < 0.2) uvBuffer[i + 4] += 1;
+          }
+        }
+      }
+      function pushVertex(vertex2) {
+        vertexBuffer.push(vertex2.x, vertex2.y, vertex2.z);
+      }
+      function getVertexByIndex(index, vertex2) {
+        const stride = index * 3;
+        vertex2.x = vertices[stride + 0];
+        vertex2.y = vertices[stride + 1];
+        vertex2.z = vertices[stride + 2];
+      }
+      function correctUVs() {
+        const a = new Vector3();
+        const b = new Vector3();
+        const c = new Vector3();
+        const centroid = new Vector3();
+        const uvA = new Vector2();
+        const uvB = new Vector2();
+        const uvC = new Vector2();
+        for (let i = 0, j = 0; i < vertexBuffer.length; i += 9, j += 6) {
+          a.set(vertexBuffer[i + 0], vertexBuffer[i + 1], vertexBuffer[i + 2]);
+          b.set(vertexBuffer[i + 3], vertexBuffer[i + 4], vertexBuffer[i + 5]);
+          c.set(vertexBuffer[i + 6], vertexBuffer[i + 7], vertexBuffer[i + 8]);
+          uvA.set(uvBuffer[j + 0], uvBuffer[j + 1]);
+          uvB.set(uvBuffer[j + 2], uvBuffer[j + 3]);
+          uvC.set(uvBuffer[j + 4], uvBuffer[j + 5]);
+          centroid.copy(a).add(b).add(c).divideScalar(3);
+          const azi = azimuth(centroid);
+          correctUV(uvA, j + 0, a, azi);
+          correctUV(uvB, j + 2, b, azi);
+          correctUV(uvC, j + 4, c, azi);
+        }
+      }
+      function correctUV(uv, stride, vector, azimuth2) {
+        if (azimuth2 < 0 && uv.x === 1) {
+          uvBuffer[stride] = uv.x - 1;
+        }
+        if (vector.x === 0 && vector.z === 0) {
+          uvBuffer[stride] = azimuth2 / 2 / Math.PI + 0.5;
+        }
+      }
+      function azimuth(vector) {
+        return Math.atan2(vector.z, -vector.x);
+      }
+      function inclination(vector) {
+        return Math.atan2(-vector.y, Math.sqrt(vector.x * vector.x + vector.z * vector.z));
+      }
+    }
+    copy(source) {
+      super.copy(source);
+      this.parameters = Object.assign({}, source.parameters);
+      return this;
+    }
+    /**
+     * Factory method for creating an instance of this class from the given
+     * JSON object.
+     *
+     * @param {Object} data - A JSON object representing the serialized geometry.
+     * @return {PolyhedronGeometry} A new instance.
+     */
+    static fromJSON(data) {
+      return new _PolyhedronGeometry(data.vertices, data.indices, data.radius, data.detail);
+    }
+  };
   var PlaneGeometry = class _PlaneGeometry extends BufferGeometry {
     /**
      * Constructs a new plane geometry.
@@ -12942,6 +13303,60 @@ var IslandGlobeBundle = (() => {
      */
     static fromJSON(data) {
       return new _SphereGeometry(data.radius, data.widthSegments, data.heightSegments, data.phiStart, data.phiLength, data.thetaStart, data.thetaLength);
+    }
+  };
+  var TetrahedronGeometry = class _TetrahedronGeometry extends PolyhedronGeometry {
+    /**
+     * Constructs a new tetrahedron geometry.
+     *
+     * @param {number} [radius=1] - Radius of the tetrahedron.
+     * @param {number} [detail=0] - Setting this to a value greater than `0` adds vertices making it no longer a tetrahedron.
+     */
+    constructor(radius = 1, detail = 0) {
+      const vertices = [
+        1,
+        1,
+        1,
+        -1,
+        -1,
+        1,
+        -1,
+        1,
+        -1,
+        1,
+        -1,
+        -1
+      ];
+      const indices = [
+        2,
+        1,
+        0,
+        0,
+        3,
+        2,
+        1,
+        3,
+        0,
+        2,
+        3,
+        1
+      ];
+      super(vertices, indices, radius, detail);
+      this.type = "TetrahedronGeometry";
+      this.parameters = {
+        radius,
+        detail
+      };
+    }
+    /**
+     * Factory method for creating an instance of this class from the given
+     * JSON object.
+     *
+     * @param {Object} data - A JSON object representing the serialized geometry.
+     * @return {TetrahedronGeometry} A new instance.
+     */
+    static fromJSON(data) {
+      return new _TetrahedronGeometry(data.radius, data.detail);
     }
   };
   function cloneUniforms(src) {
@@ -28702,23 +29117,76 @@ void main() {
   function createLandAnimals(landByBiome, playful, seed) {
     const random = seededRandom(seed + 1401);
     const animals = [];
-    const biomeColors = playful ? [0, 16766575, 8257415, 16773360] : [0, 13152393, 8437874, 14342622];
+    const groupsByBiome = [null, /* @__PURE__ */ new Map(), /* @__PURE__ */ new Map(), /* @__PURE__ */ new Map()];
     for (let biome = 1; biome <= 3; biome += 1) {
-      const points = landByBiome[biome];
-      const total = Math.min(10, points.length);
-      for (let i = 0; i < total; i += 1) {
-        const n = points[Math.floor(random() * points.length)];
-        const body = new Mesh(
-          new BoxGeometry(0.035, 0.03, 0.05),
-          new MeshStandardMaterial({ color: biomeColors[biome], roughness: 0.7, metalness: 0 })
-        );
-        const h = 1.566 + random() * 8e-3;
-        body.position.set(n.x * h, n.y * h, n.z * h);
-        body.lookAt(body.position.clone().multiplyScalar(2));
-        animals.push(body);
-      }
+      landByBiome[biome].forEach((normal) => {
+        const key = octantKey(normal);
+        if (!groupsByBiome[biome].has(key)) groupsByBiome[biome].set(key, []);
+        groupsByBiome[biome].get(key).push(normal);
+      });
+    }
+    const faunaByBiome = {
+      1: ["turtle", "boar", "rabbit"],
+      2: ["deer", "fox", "bird"],
+      3: ["goat", "yak", "hawk"]
+    };
+    const paletteByBiome = playful ? { 1: [16766059, 16756602, 16117976], 2: [8446830, 16756846, 8781785], 3: [15001855, 12043007, 16777215] } : { 1: [13152393, 12094054, 14209210], 2: [8437874, 10455907, 8365473], 3: [14342622, 10397624, 15265526] };
+    for (let biome = 1; biome <= 3; biome += 1) {
+      groupsByBiome[biome].forEach((points, octant) => {
+        if (!points.length) return;
+        const fauna = faunaByBiome[biome];
+        const colorChoices = paletteByBiome[biome];
+        const pick = (octant * 17 + biome * 11 + Math.floor(seed)) % fauna.length;
+        const animalType = fauna[pick];
+        const color = colorChoices[pick % colorChoices.length];
+        const amount = Math.min(4, Math.max(1, Math.floor(points.length / 6)));
+        for (let i = 0; i < amount; i += 1) {
+          const n = points[Math.floor(random() * points.length)];
+          const animal = createAnimalMesh(animalType, color);
+          const h = 1.566 + random() * 8e-3;
+          animal.position.set(n.x * h, n.y * h, n.z * h);
+          animal.lookAt(animal.position.clone().multiplyScalar(2));
+          animal.rotateY(random() * Math.PI * 2);
+          animals.push(animal);
+        }
+      });
     }
     return animals;
+  }
+  function octantKey(normal) {
+    const x = normal.x >= 0 ? 1 : 0;
+    const y = normal.y >= 0 ? 1 : 0;
+    const z = normal.z >= 0 ? 1 : 0;
+    return x << 2 | y << 1 | z;
+  }
+  function createAnimalMesh(type, color) {
+    const material = new MeshStandardMaterial({ color, roughness: 0.8, metalness: 0 });
+    const group = new Group();
+    const body = new Mesh(new SphereGeometry(0.018, 8, 6), material);
+    const head = new Mesh(new SphereGeometry(0.011, 8, 6), material.clone());
+    head.position.set(0, 4e-3, 0.016);
+    group.add(body);
+    group.add(head);
+    if (type === "bird" || type === "hawk") {
+      const wingL = new Mesh(new TetrahedronGeometry(0.01), material.clone());
+      const wingR = wingL.clone();
+      wingL.position.set(-0.016, 0, 0);
+      wingR.position.set(0.016, 0, 0);
+      group.add(wingL, wingR);
+    } else if (type === "deer" || type === "goat" || type === "yak") {
+      const hornL = new Mesh(new ConeGeometry(3e-3, 0.01, 5), material.clone());
+      const hornR = hornL.clone();
+      hornL.position.set(-4e-3, 0.014, 0.019);
+      hornR.position.set(4e-3, 0.014, 0.019);
+      group.add(hornL, hornR);
+    } else if (type === "rabbit" || type === "fox") {
+      const earL = new Mesh(new BoxGeometry(3e-3, 0.012, 3e-3), material.clone());
+      const earR = earL.clone();
+      earL.position.set(-35e-4, 0.014, 0.017);
+      earR.position.set(35e-4, 0.014, 0.017);
+      group.add(earL, earR);
+    }
+    return group;
   }
   function getPalette(presetId, playful, presets) {
     if (!playful) return presets[presetId].biomes.map((biome) => biome.color);
