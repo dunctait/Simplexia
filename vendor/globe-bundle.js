@@ -12707,6 +12707,156 @@ var IslandGlobeBundle = (() => {
       return new _BoxGeometry(data.width, data.height, data.depth, data.widthSegments, data.heightSegments, data.depthSegments);
     }
   };
+  var CylinderGeometry = class _CylinderGeometry extends BufferGeometry {
+    /**
+     * Constructs a new cylinder geometry.
+     *
+     * @param {number} [radiusTop=1] - Radius of the cylinder at the top.
+     * @param {number} [radiusBottom=1] - Radius of the cylinder at the bottom.
+     * @param {number} [height=1] - Height of the cylinder.
+     * @param {number} [radialSegments=32] - Number of segmented faces around the circumference of the cylinder.
+     * @param {number} [heightSegments=1] - Number of rows of faces along the height of the cylinder.
+     * @param {boolean} [openEnded=false] - Whether the base of the cylinder is open or capped.
+     * @param {number} [thetaStart=0] - Start angle for first segment, in radians.
+     * @param {number} [thetaLength=Math.PI*2] - The central angle, often called theta, of the circular sector, in radians.
+     * The default value results in a complete cylinder.
+     */
+    constructor(radiusTop = 1, radiusBottom = 1, height = 1, radialSegments = 32, heightSegments = 1, openEnded = false, thetaStart = 0, thetaLength = Math.PI * 2) {
+      super();
+      this.type = "CylinderGeometry";
+      this.parameters = {
+        radiusTop,
+        radiusBottom,
+        height,
+        radialSegments,
+        heightSegments,
+        openEnded,
+        thetaStart,
+        thetaLength
+      };
+      const scope = this;
+      radialSegments = Math.floor(radialSegments);
+      heightSegments = Math.floor(heightSegments);
+      const indices = [];
+      const vertices = [];
+      const normals = [];
+      const uvs = [];
+      let index = 0;
+      const indexArray = [];
+      const halfHeight = height / 2;
+      let groupStart = 0;
+      generateTorso();
+      if (openEnded === false) {
+        if (radiusTop > 0) generateCap(true);
+        if (radiusBottom > 0) generateCap(false);
+      }
+      this.setIndex(indices);
+      this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+      this.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+      this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+      function generateTorso() {
+        const normal = new Vector3();
+        const vertex2 = new Vector3();
+        let groupCount = 0;
+        const slope = (radiusBottom - radiusTop) / height;
+        for (let y = 0; y <= heightSegments; y++) {
+          const indexRow = [];
+          const v = y / heightSegments;
+          const radius = v * (radiusBottom - radiusTop) + radiusTop;
+          for (let x = 0; x <= radialSegments; x++) {
+            const u = x / radialSegments;
+            const theta = u * thetaLength + thetaStart;
+            const sinTheta = Math.sin(theta);
+            const cosTheta = Math.cos(theta);
+            vertex2.x = radius * sinTheta;
+            vertex2.y = -v * height + halfHeight;
+            vertex2.z = radius * cosTheta;
+            vertices.push(vertex2.x, vertex2.y, vertex2.z);
+            normal.set(sinTheta, slope, cosTheta).normalize();
+            normals.push(normal.x, normal.y, normal.z);
+            uvs.push(u, 1 - v);
+            indexRow.push(index++);
+          }
+          indexArray.push(indexRow);
+        }
+        for (let x = 0; x < radialSegments; x++) {
+          for (let y = 0; y < heightSegments; y++) {
+            const a = indexArray[y][x];
+            const b = indexArray[y + 1][x];
+            const c = indexArray[y + 1][x + 1];
+            const d = indexArray[y][x + 1];
+            if (radiusTop > 0 || y !== 0) {
+              indices.push(a, b, d);
+              groupCount += 3;
+            }
+            if (radiusBottom > 0 || y !== heightSegments - 1) {
+              indices.push(b, c, d);
+              groupCount += 3;
+            }
+          }
+        }
+        scope.addGroup(groupStart, groupCount, 0);
+        groupStart += groupCount;
+      }
+      function generateCap(top) {
+        const centerIndexStart = index;
+        const uv = new Vector2();
+        const vertex2 = new Vector3();
+        let groupCount = 0;
+        const radius = top === true ? radiusTop : radiusBottom;
+        const sign = top === true ? 1 : -1;
+        for (let x = 1; x <= radialSegments; x++) {
+          vertices.push(0, halfHeight * sign, 0);
+          normals.push(0, sign, 0);
+          uvs.push(0.5, 0.5);
+          index++;
+        }
+        const centerIndexEnd = index;
+        for (let x = 0; x <= radialSegments; x++) {
+          const u = x / radialSegments;
+          const theta = u * thetaLength + thetaStart;
+          const cosTheta = Math.cos(theta);
+          const sinTheta = Math.sin(theta);
+          vertex2.x = radius * sinTheta;
+          vertex2.y = halfHeight * sign;
+          vertex2.z = radius * cosTheta;
+          vertices.push(vertex2.x, vertex2.y, vertex2.z);
+          normals.push(0, sign, 0);
+          uv.x = cosTheta * 0.5 + 0.5;
+          uv.y = sinTheta * 0.5 * sign + 0.5;
+          uvs.push(uv.x, uv.y);
+          index++;
+        }
+        for (let x = 0; x < radialSegments; x++) {
+          const c = centerIndexStart + x;
+          const i = centerIndexEnd + x;
+          if (top === true) {
+            indices.push(i, i + 1, c);
+          } else {
+            indices.push(i + 1, i, c);
+          }
+          groupCount += 3;
+        }
+        scope.addGroup(groupStart, groupCount, top === true ? 1 : 2);
+        groupStart += groupCount;
+      }
+    }
+    copy(source) {
+      super.copy(source);
+      this.parameters = Object.assign({}, source.parameters);
+      return this;
+    }
+    /**
+     * Factory method for creating an instance of this class from the given
+     * JSON object.
+     *
+     * @param {Object} data - A JSON object representing the serialized geometry.
+     * @return {CylinderGeometry} A new instance.
+     */
+    static fromJSON(data) {
+      return new _CylinderGeometry(data.radiusTop, data.radiusBottom, data.height, data.radialSegments, data.heightSegments, data.openEnded, data.thetaStart, data.thetaLength);
+    }
+  };
   var PlaneGeometry = class _PlaneGeometry extends BufferGeometry {
     /**
      * Constructs a new plane geometry.
@@ -28279,6 +28429,7 @@ void main() {
     planetGroup.quaternion.setFromEuler(initialEuler);
     const pointers = /* @__PURE__ */ new Map();
     let pinchDistance = 0;
+    let justEndedPinchUntil = 0;
     container.addEventListener("touchmove", (event) => event.preventDefault(), { passive: false });
     container.addEventListener("wheel", (event) => {
       event.preventDefault();
@@ -28311,6 +28462,11 @@ void main() {
         return;
       }
       if (!dragging) return;
+      if (performance.now() < justEndedPinchUntil) {
+        lastX = event.clientX;
+        lastY = event.clientY;
+        return;
+      }
       event.preventDefault();
       const dx = event.clientX - lastX;
       const dy = event.clientY - lastY;
@@ -28330,6 +28486,7 @@ void main() {
         pinchDistance = 0;
         velocityX = 0;
         velocityY = 0;
+        justEndedPinchUntil = performance.now() + 140;
       }
     });
     container.addEventListener("pointercancel", (event) => {
@@ -28339,6 +28496,7 @@ void main() {
         pinchDistance = 0;
         velocityX = 0;
         velocityY = 0;
+        justEndedPinchUntil = performance.now() + 140;
       }
     });
     function applyZoom(delta) {
@@ -28371,7 +28529,7 @@ void main() {
       ocean = new Mesh(
         new SphereGeometry(1.552, segments, Math.max(48, Math.round(segments * 0.62))),
         new MeshPhysicalMaterial({
-          color: playful ? 3832063 : 1457525,
+          color: playful ? 3117823 : 1788808,
           transparent: true,
           opacity: playful ? 0.66 : 0.54,
           roughness: 0.22,
@@ -28384,9 +28542,9 @@ void main() {
       atmosphere = new Mesh(
         new SphereGeometry(1.64, segments, Math.max(48, Math.round(segments * 0.62))),
         new MeshBasicMaterial({
-          color: 10344447,
+          color: playful ? 11857151 : 10344447,
           transparent: true,
-          opacity: 0.11,
+          opacity: playful ? 0.15 : 0.11,
           blending: AdditiveBlending,
           side: BackSide,
           depthWrite: false
@@ -28599,7 +28757,7 @@ void main() {
       new MeshStandardMaterial({
         map: texture,
         transparent: true,
-        opacity: 0.2 + coverage * 0.55,
+        opacity: coverage > 0.01 ? 0.62 : 0,
         depthWrite: false,
         roughness: 0.95,
         metalness: 0
@@ -28613,17 +28771,23 @@ void main() {
     canvas.height = 256;
     const ctx = canvas.getContext("2d");
     const random = seededRandom(seed + 97);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const puffs = Math.floor(220 + coverage * 520);
-    for (let i = 0; i < puffs; i += 1) {
-      const x = random() * canvas.width;
-      const y = random() * canvas.height;
-      const base = 8 + random() * (14 + coverage * 32);
-      const alpha = 0.1 + random() * (0.32 + coverage * 0.18);
-      ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
-      for (let k = 0; k < 4; k += 1) {
+    ctx.fillStyle = "rgba(0,0,0,0)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const clusters = Math.max(2, Math.floor(3 + coverage * 40));
+    for (let c = 0; c < clusters; c += 1) {
+      const cx = random() * canvas.width;
+      const cy = random() * canvas.height;
+      const radius = 36 + random() * (34 + coverage * 200);
+      const blobs = 5 + Math.floor(random() * 6);
+      for (let i = 0; i < blobs; i += 1) {
+        const ox = (random() - 0.5) * radius * 1.2;
+        const oy = (random() - 0.5) * radius * 0.7;
+        const rx = radius * (0.35 + random() * 0.45);
+        const ry = radius * (0.2 + random() * 0.35);
+        const alpha = 0.74 + random() * 0.24;
+        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
         ctx.beginPath();
-        ctx.ellipse(x + (random() - 0.5) * base, y + (random() - 0.5) * base, base * (0.55 + random() * 0.7), base * (0.4 + random() * 0.5), random() * Math.PI, 0, Math.PI * 2);
+        ctx.ellipse(cx + ox, cy + oy, rx, ry, random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -28672,7 +28836,7 @@ void main() {
     const baseColor = playful ? 16049349 : 14800319;
     for (let i = 0; i < Math.min(16, pool.length); i += 1) {
       const n = pool[Math.floor(random() * pool.length)];
-      const geometry = buildingPrototypeGeometries.length ? buildingPrototypeGeometries[Math.floor(random() * buildingPrototypeGeometries.length)].clone() : new BoxGeometry(0.04, 0.04, 0.04);
+      const geometry = buildingPrototypeGeometries.length ? buildingPrototypeGeometries[Math.floor(random() * buildingPrototypeGeometries.length)].clone() : createFallbackHouseGeometry(0.11, 0.07, 0.06);
       const mesh = new Mesh(geometry, new MeshStandardMaterial({ color: baseColor, roughness: 0.9, metalness: 0 }));
       const h = 1.565 + random() * 0.01;
       mesh.position.set(n.x * h, n.y * h, n.z * h);
@@ -28682,6 +28846,9 @@ void main() {
       towns.push(mesh);
     }
     return towns;
+  }
+  function createFallbackHouseGeometry(width, height, roofHeight) {
+    return new CylinderGeometry(width * 0.45, width * 0.62, height + roofHeight, 6);
   }
   function createLandAnimals(landByBiome, playful, seed) {
     const random = seededRandom(seed + 1401);

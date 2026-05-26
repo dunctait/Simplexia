@@ -64,6 +64,7 @@ export function createGlobeScene(container, generator) {
   planetGroup.quaternion.setFromEuler(initialEuler);
   const pointers = new Map();
   let pinchDistance = 0;
+  let justEndedPinchUntil = 0;
 
   container.addEventListener('touchmove', (event) => event.preventDefault(), { passive: false });
   container.addEventListener('wheel', (event) => {
@@ -97,6 +98,11 @@ export function createGlobeScene(container, generator) {
       return;
     }
     if (!dragging) return;
+    if (performance.now() < justEndedPinchUntil) {
+      lastX = event.clientX;
+      lastY = event.clientY;
+      return;
+    }
     event.preventDefault();
     const dx = event.clientX - lastX;
     const dy = event.clientY - lastY;
@@ -116,6 +122,7 @@ export function createGlobeScene(container, generator) {
       pinchDistance = 0;
       velocityX = 0;
       velocityY = 0;
+      justEndedPinchUntil = performance.now() + 140;
     }
   });
   container.addEventListener('pointercancel', (event) => {
@@ -125,6 +132,7 @@ export function createGlobeScene(container, generator) {
       pinchDistance = 0;
       velocityX = 0;
       velocityY = 0;
+      justEndedPinchUntil = performance.now() + 140;
     }
   });
 
@@ -161,7 +169,7 @@ export function createGlobeScene(container, generator) {
     ocean = new THREE.Mesh(
       new THREE.SphereGeometry(1.552, segments, Math.max(48, Math.round(segments * 0.62))),
       new THREE.MeshPhysicalMaterial({
-        color: playful ? 0x3a78ff : 0x163d75,
+        color: playful ? 0x2f92ff : 0x1b4b88,
         transparent: true,
         opacity: playful ? 0.66 : 0.54,
         roughness: 0.22,
@@ -174,9 +182,9 @@ export function createGlobeScene(container, generator) {
     atmosphere = new THREE.Mesh(
       new THREE.SphereGeometry(1.64, segments, Math.max(48, Math.round(segments * 0.62))),
       new THREE.MeshBasicMaterial({
-        color: 0x9dd7ff,
+        color: playful ? 0xb4ecff : 0x9dd7ff,
         transparent: true,
-        opacity: 0.11,
+        opacity: playful ? 0.15 : 0.11,
         blending: THREE.AdditiveBlending,
         side: THREE.BackSide,
         depthWrite: false
@@ -413,7 +421,7 @@ function createCloudLayer(segments, seed, coverage) {
     new THREE.MeshStandardMaterial({
       map: texture,
       transparent: true,
-      opacity: 0.2 + coverage * 0.55,
+      opacity: coverage > 0.01 ? 0.62 : 0,
       depthWrite: false,
       roughness: 0.95,
       metalness: 0
@@ -428,17 +436,23 @@ function createCloudTexture(seed, coverage) {
   canvas.height = 256;
   const ctx = canvas.getContext('2d');
   const random = seededRandom(seed + 97);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const puffs = Math.floor(220 + coverage * 520);
-  for (let i = 0; i < puffs; i += 1) {
-    const x = random() * canvas.width;
-    const y = random() * canvas.height;
-    const base = 8 + random() * (14 + coverage * 32);
-    const alpha = 0.1 + random() * (0.32 + coverage * 0.18);
-    ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
-    for (let k = 0; k < 4; k += 1) {
+  ctx.fillStyle = 'rgba(0,0,0,0)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const clusters = Math.max(2, Math.floor(3 + coverage * 40));
+  for (let c = 0; c < clusters; c += 1) {
+    const cx = random() * canvas.width;
+    const cy = random() * canvas.height;
+    const radius = 36 + random() * (34 + coverage * 200);
+    const blobs = 5 + Math.floor(random() * 6);
+    for (let i = 0; i < blobs; i += 1) {
+      const ox = (random() - 0.5) * radius * 1.2;
+      const oy = (random() - 0.5) * radius * 0.7;
+      const rx = radius * (0.35 + random() * 0.45);
+      const ry = radius * (0.2 + random() * 0.35);
+      const alpha = 0.74 + random() * 0.24;
+      ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
       ctx.beginPath();
-      ctx.ellipse(x + (random() - 0.5) * base, y + (random() - 0.5) * base, base * (0.55 + random() * 0.7), base * (0.4 + random() * 0.5), random() * Math.PI, 0, Math.PI * 2);
+      ctx.ellipse(cx + ox, cy + oy, rx, ry, random() * Math.PI, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -491,7 +505,7 @@ function createTowns(beach, forest, playful, seed) {
     const n = pool[Math.floor(random() * pool.length)];
     const geometry = buildingPrototypeGeometries.length
       ? buildingPrototypeGeometries[Math.floor(random() * buildingPrototypeGeometries.length)].clone()
-      : new THREE.BoxGeometry(0.04, 0.04, 0.04);
+      : createFallbackHouseGeometry(0.11, 0.07, 0.06);
     const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.9, metalness: 0 }));
     const h = 1.565 + random() * 0.01;
     mesh.position.set(n.x * h, n.y * h, n.z * h);
@@ -501,6 +515,10 @@ function createTowns(beach, forest, playful, seed) {
     towns.push(mesh);
   }
   return towns;
+}
+
+function createFallbackHouseGeometry(width, height, roofHeight) {
+  return new THREE.CylinderGeometry(width * 0.45, width * 0.62, height + roofHeight, 6);
 }
 
 function createLandAnimals(landByBiome, playful, seed) {

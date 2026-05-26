@@ -12,7 +12,7 @@
     beachLevel: 0.27,
     mountainLevel: 0.6,
     playfulPalette: 1,
-    cloudCoverage: 0.55,
+    cloudCoverage: 0.08,
     moonCount: 2,
     showRings: 0,
     showFish: 0,
@@ -55,7 +55,7 @@
     if (input.columns || input.rows) settings.resolution = Math.round(Math.max(input.columns || 0, input.rows || 0) / 8) * 8;
     if (input.scale && !input.surfaceScale) settings.surfaceScale = clampNumber(input.scale * 180, 1, 9);
     if (input.continentScale && !input.landmassFrequency) settings.landmassFrequency = input.continentScale;
-    if (typeof input.showClouds !== 'undefined' && typeof input.cloudCoverage === 'undefined') settings.cloudCoverage = input.showClouds ? 0.55 : 0;
+    if (typeof input.showClouds !== 'undefined' && typeof input.cloudCoverage === 'undefined') settings.cloudCoverage = input.showClouds ? 0.08 : 0;
     if (typeof input.showMoons !== 'undefined' && typeof input.moonCount === 'undefined') settings.moonCount = input.showMoons ? 2 : 0;
     settings.resolution = clampInt(settings.resolution, 64, 384);
     settings.landmassFrequency = clampNumber(settings.landmassFrequency, 0.45, 2.8);
@@ -67,7 +67,7 @@
     settings.beachLevel = clampNumber(Math.max(settings.beachLevel, settings.seaLevel + 0.01), 0.08, 0.7);
     settings.mountainLevel = clampNumber(Math.max(settings.mountainLevel, settings.beachLevel + 0.01), 0.3, 0.95);
     settings.playfulPalette = clampInt(settings.playfulPalette, 0, 1);
-    settings.cloudCoverage = clampNumber(settings.cloudCoverage, 0, 1);
+    settings.cloudCoverage = clampNumber(settings.cloudCoverage, 0, 0.2);
     settings.moonCount = clampInt(settings.moonCount, 0, 24);
     settings.showRings = clampInt(settings.showRings, 0, 1);
     settings.showFish = clampInt(settings.showFish, 0, 1);
